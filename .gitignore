@@ -5,9 +5,7 @@
 create_*.py
 create_folders.py
 
-# 데이터 폴더 (크롤링 데이터로 교체 예정)
-brands_db/
-customers_db/
+# 벡터 스토어 (재생성 가능)
 vector_store/
 
 # 평가 결과 (실행 시 생성됨)
