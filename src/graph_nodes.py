@@ -9,7 +9,7 @@ import pandas as pd
 from pathlib import Path
 from typing import TypedDict, List, Dict
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from .prompts import *
 
