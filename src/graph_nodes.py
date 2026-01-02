@@ -66,10 +66,18 @@ class GraphNodes:
         """노드 1: 페르소나 분석"""
         print("\n[1. Persona Analyzer] 페르소나 분석 중...")
 
-        # 페르소나 데이터 로드
-        persona = self.personas_df[
-            self.personas_df['persona_id'] == state['persona_id']
-        ].iloc[0].to_dict()
+        # use_csv 플래그 확인 (폼 데이터 직접 사용 시 CSV 로드 스킵)
+        if state.get('use_csv', True) and state.get('persona_data'):
+            # 이미 persona_data가 있으면 그대로 사용
+            persona = state['persona_data']
+        elif state.get('use_csv', True):
+            # CSV에서 페르소나 데이터 로드
+            persona = self.personas_df[
+                self.personas_df['persona_id'] == state['persona_id']
+            ].iloc[0].to_dict()
+        else:
+            # 폼 데이터로 전달된 persona_data 사용
+            persona = state['persona_data']
 
         # 프롬프트 생성
         prompt = PERSONA_ANALYZER_PROMPT.format(**persona)
