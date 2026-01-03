@@ -383,6 +383,39 @@ body {
     white-space: pre-wrap;
 }
 
+/* 수정 가능한 필드 (textarea) */
+.message-title-input,
+.message-body-input {
+    width: 100%;
+    padding: 12px;
+    font-family: inherit;
+    font-size: 1rem;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.8);
+    border: 2px solid rgba(127, 168, 232, 0.3);
+    border-radius: 10px;
+    resize: vertical;
+    transition: border-color 0.3s ease;
+}
+
+.message-title-input {
+    font-size: 1.1rem;
+    font-weight: 600;
+    min-height: 60px;
+}
+
+.message-body-input {
+    min-height: 180px;
+    line-height: 1.6;
+}
+
+.message-title-input:focus,
+.message-body-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(127, 168, 232, 0.1);
+}
+
 .products-section {
     margin-top: 25px;
 }
@@ -407,10 +440,40 @@ body {
     color: var(--text-primary);
 }
 
-.retry-btn {
-    width: 100%;
+/* 액션 버튼 컨테이너 */
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 25px;
+}
+
+/* 저장 버튼 */
+.save-btn {
+    flex: 1;
     padding: 14px 24px;
-    margin-top: 20px;
+    background: linear-gradient(135deg, #6BAED6 0%, #7FA8E8 100%);
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(127, 168, 232, 0.3);
+}
+
+.save-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(127, 168, 232, 0.4);
+}
+
+.save-btn:active {
+    transform: translateY(0);
+}
+
+.retry-btn {
+    flex: 1;
+    padding: 14px 24px;
     background: rgba(255, 255, 255, 0.7);
     border: 2px solid var(--accent-color);
     border-radius: 12px;

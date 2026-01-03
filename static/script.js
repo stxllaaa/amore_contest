@@ -5,6 +5,11 @@ const loadingState = document.getElementById('loadingState');
 const resultState = document.getElementById('resultState');
 const errorState = document.getElementById('errorState');
 
+// 원본 데이터 저장용 변수
+let originalTitle = '';
+let originalBody = '';
+let inputKeywords = '';
+
 // 폼 제출 이벤트
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -27,6 +32,9 @@ form.addEventListener('submit', async (e) => {
     if (weatherKeyword) preferredKeywords.push(weatherKeyword);
     if (toneKeyword) preferredKeywords.push(toneKeyword);
     if (usageKeyword) preferredKeywords.push(usageKeyword);
+
+    // 입력 키워드 저장 (나중에 CSV 저장용)
+    inputKeywords = preferredKeywords.join(', ');
 
     // 데이터 객체 생성
     const data = {
@@ -129,10 +137,14 @@ function showResult(result) {
     resultState.style.display = 'block';
     errorState.style.display = 'none';
 
+    // 원본 데이터 저장
+    originalTitle = result.title;
+    originalBody = result.body;
+
     // 결과 데이터 표시
     document.getElementById('resultBrand').textContent = result.brand;
-    document.getElementById('messageTitle').textContent = result.title;
-    document.getElementById('messageBody').textContent = result.body;
+    document.getElementById('messageTitle').value = result.title;
+    document.getElementById('messageBody').value = result.body;
 
     // 제품 목록 표시
     const productsList = document.getElementById('productsList');
@@ -175,6 +187,48 @@ function resetForm() {
 
     // 초기 상태로 스크롤
     initialState.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// 마케팅 데이터 자산으로 저장
+async function saveAsMarketingAsset() {
+    // 현재 화면에 표시된 제목과 본문 가져오기 (textarea의 value)
+    const currentTitle = document.getElementById('messageTitle').value;
+    const currentBody = document.getElementById('messageBody').value;
+
+    // 수정 여부 확인
+    const isEdited = (currentTitle !== originalTitle) || (currentBody !== originalBody);
+
+    // 저장할 데이터
+    const saveData = {
+        input_keywords: inputKeywords,
+        original_title: originalTitle,
+        final_title: currentTitle,
+        final_body: currentBody,
+        is_edited: isEdited
+    };
+
+    try {
+        // API 호출
+        const response = await fetch('/api/save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(saveData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            const editStatus = isEdited ? 'O (수정됨)' : 'X (원본 그대로)';
+            alert(`마케팅 자산으로 등록되었습니다.\n수정 여부: ${editStatus}`);
+        } else {
+            alert('저장 중 오류가 발생했습니다: ' + result.error);
+        }
+    } catch (error) {
+        console.error('Save error:', error);
+        alert('저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    }
 }
 
 // 페이지 로드 시 초기화

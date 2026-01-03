@@ -266,13 +266,13 @@
                         </div>
 
                         <div class="message-box">
-                            <div class="message-title-label">제목</div>
-                            <div class="message-title" id="messageTitle"></div>
+                            <div class="message-title-label">제목 (수정 가능)</div>
+                            <textarea class="message-title-input" id="messageTitle" rows="2"></textarea>
                         </div>
 
                         <div class="message-box">
-                            <div class="message-body-label">본문</div>
-                            <div class="message-body" id="messageBody"></div>
+                            <div class="message-body-label">본문 (수정 가능)</div>
+                            <textarea class="message-body-input" id="messageBody" rows="8"></textarea>
                         </div>
 
                         <div class="products-section">
@@ -280,9 +280,14 @@
                             <ul class="products-list" id="productsList"></ul>
                         </div>
 
-                        <button class="retry-btn" onclick="resetForm()">
-                            <span>다시 생성하기</span>
-                        </button>
+                        <div class="action-buttons">
+                            <button class="save-btn" onclick="saveAsMarketingAsset()">
+                                <span>📁 데이터 자산으로 저장</span>
+                            </button>
+                            <button class="retry-btn" onclick="resetForm()">
+                                <span>다시 생성하기</span>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- 에러 상태 -->
