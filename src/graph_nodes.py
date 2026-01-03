@@ -20,6 +20,8 @@ class MessageGenerationState(TypedDict):
     persona_id: str
     message_purpose: str
     brand: str  # optional
+    gender: str  # '남성' or '여성'
+    price_sensitivity: str  # 'Low', 'Mid', 'High'
 
     # 중간 결과
     persona_data: Dict
@@ -53,10 +55,6 @@ class GraphNodes:
         )
 
         # 데이터 로드
-        self.personas_df = pd.read_csv(
-            Path(os.getenv("CUSTOMERS_DB_PATH", "./customers_db")) / "customer_personas.csv",
-            encoding='utf-8-sig'
-        )
         self.brands_df = pd.read_csv(
             self.db_path / "brand_info.csv",
             encoding='utf-8-sig'
@@ -66,18 +64,8 @@ class GraphNodes:
         """노드 1: 페르소나 분석"""
         print("\n[1. Persona Analyzer] 페르소나 분석 중...")
 
-        # use_csv 플래그 확인 (폼 데이터 직접 사용 시 CSV 로드 스킵)
-        if state.get('use_csv', True) and state.get('persona_data'):
-            # 이미 persona_data가 있으면 그대로 사용
-            persona = state['persona_data']
-        elif state.get('use_csv', True):
-            # CSV에서 페르소나 데이터 로드
-            persona = self.personas_df[
-                self.personas_df['persona_id'] == state['persona_id']
-            ].iloc[0].to_dict()
-        else:
-            # 폼 데이터로 전달된 persona_data 사용
-            persona = state['persona_data']
+        # 폼 데이터로 전달된 persona_data 사용
+        persona = state['persona_data']
 
         # 프롬프트 생성
         prompt = PERSONA_ANALYZER_PROMPT.format(**persona)
@@ -157,14 +145,16 @@ class GraphNodes:
         return state
 
     def product_retriever(self, state: MessageGenerationState) -> MessageGenerationState:
-        """노드 3: 제품 검색 (RAG) - 카테고리 우선 매칭 + 키워드 의미 기반 매칭"""
+        """노드 3: 제품 검색 (RAG) - 카테고리 우선 매칭 + 키워드 의미 기반 매칭 + 가격 민감도 반영"""
         print("\n[3. Product Retriever] 제품 검색 중...")
 
         persona = state['persona_data']
+        price_sensitivity = state.get('price_sensitivity', 'Mid')
 
         # 사용자가 선택한 카테고리 (필수)
         preferred_category = persona.get('product_category', '')
         print(f"  [DEBUG] 선호 카테고리: {preferred_category}")
+        print(f"  [DEBUG] 가격 민감도: {price_sensitivity}")
 
         if not preferred_category:
             print(f"  [WARNING] 선호 카테고리가 지정되지 않았습니다.")
@@ -192,21 +182,28 @@ class GraphNodes:
 
             product_category = doc.metadata.get('category', '')
 
+            # 가격 정보 추출 및 변환 (문자열 "2,500" -> 숫자 2500)
+            price_str = doc.metadata.get('price', '0')
+            try:
+                price = int(str(price_str).replace(',', '').replace('원', '').strip())
+            except (ValueError, AttributeError):
+                price = 0
+
             # 카테고리 매칭 (최우선)
             if preferred_category and product_category == preferred_category:
                 products.append({
                     'name': doc.metadata['product_name'],
                     'category': product_category,
-                    'description': doc.page_content
+                    'description': doc.page_content,
+                    'price': price
                 })
-                if len(products) >= 3:
-                    break
             elif not preferred_category:
                 # 카테고리 선호가 없는 경우만 다른 카테고리 허용
                 fallback_products.append({
                     'name': doc.metadata['product_name'],
                     'category': product_category,
-                    'description': doc.page_content
+                    'description': doc.page_content,
+                    'price': price
                 })
 
         # 선호 카테고리에서 제품을 찾지 못한 경우
@@ -222,13 +219,18 @@ class GraphNodes:
                 for doc in broad_results:
                     if doc.metadata.get('brand') == state['selected_brand'] and \
                        doc.metadata.get('category') == preferred_category:
+                        price_str = doc.metadata.get('price', '0')
+                        try:
+                            price = int(str(price_str).replace(',', '').replace('원', '').strip())
+                        except (ValueError, AttributeError):
+                            price = 0
+
                         products.append({
                             'name': doc.metadata['product_name'],
                             'category': doc.metadata['category'],
-                            'description': doc.page_content
+                            'description': doc.page_content,
+                            'price': price
                         })
-                        if len(products) >= 3:
-                            break
             else:
                 print(f"  [INFO] 선호 카테고리({preferred_category})에서 {len(products)}개만 발견")
 
@@ -238,14 +240,30 @@ class GraphNodes:
             products.extend(fallback_products[:needed])
             print(f"  [INFO] fallback 제품 {needed}개 추가")
 
+        # 가격 민감도에 따라 정렬 (Soft Logic - Re-ranking)
+        if price_sensitivity == 'Low':
+            # 가성비 중시: 가격 낮은 순
+            products.sort(key=lambda x: x['price'])
+            print(f"  [SORT] 가성비 중시 - 가격 낮은 순 정렬")
+        elif price_sensitivity == 'High':
+            # 고가 선호: 가격 높은 순
+            products.sort(key=lambda x: x['price'], reverse=True)
+            print(f"  [SORT] 고가 선호 - 가격 높은 순 정렬")
+        else:
+            # Mid: 유사도 순 그대로 (정렬하지 않음)
+            print(f"  [SORT] 중간 가격대 - 유사도 순 유지")
+
+        # 최종 3개 선택
+        final_products = products[:3]
+
         # 성분 기반 추가 정보 enrichment
-        enriched_products = self._enrich_with_ingredients(products, persona)
+        enriched_products = self._enrich_with_ingredients(final_products, persona)
 
         state['retrieved_products'] = enriched_products
 
         print(f"  [OK] 검색된 제품: {len(enriched_products)}개")
         for p in enriched_products:
-            print(f"    - {p['name']} (카테고리: {p['category']})")
+            print(f"    - {p['name']} (카테고리: {p['category']}, 가격: {p['price']:,}원)")
 
         return state
 
@@ -364,17 +382,18 @@ class GraphNodes:
         return products
 
     def review_context_enricher(self, state: MessageGenerationState) -> MessageGenerationState:
-        """노드 4: 리뷰 컨텍스트 추가 - 라이프스타일 키워드 기반"""
+        """노드 4: 리뷰 컨텍스트 추가 - 라이프스타일 키워드 기반 + 성별 반영"""
         print("\n[4. Review Context Enricher] 리뷰 분석 중...")
 
         persona = state['persona_data']
+        gender = state.get('gender', '여성')
 
         # 라이프스타일 키워드 확장
         lifestyle_keywords = persona.get('lifestyle_keywords', '')
         expanded_query = self._expand_lifestyle_keywords(lifestyle_keywords)
 
-        # 유사 리뷰 검색 (확장된 키워드로)
-        query = f"{persona['age']}세 {persona['skin_type']} {expanded_query}"
+        # 유사 리뷰 검색 (확장된 키워드 + 성별 포함)
+        query = f"{persona['age']}세 {gender} {persona['skin_type']} {expanded_query}"
         print(f"  [DEBUG] 리뷰 검색 쿼리: {query}")
         review_results = self.vector_manager.search_reviews(query, k=3)
 
@@ -456,6 +475,7 @@ class GraphNodes:
             occupation=persona.get('occupation', ''),
             skin_concerns=persona['skin_concerns'],
             lifestyle_keywords=persona.get('lifestyle_keywords', ''),
+            price_sensitivity=state.get('price_sensitivity', 'Mid'),
             products=products_text,
             tone_examples=tone_text,
             empathy_points=", ".join(state['empathy_points']),

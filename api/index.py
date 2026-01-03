@@ -63,7 +63,8 @@ def generate_message():
         # 폼 데이터에서 페르소나 정보 추출
         persona_data = {
             'age': data.get('age'),
-            'gender': data.get('gender', 'F'),
+            'gender': data.get('gender', '여성'),
+            'price_sensitivity': data.get('price_sensitivity', 'Mid'),
             'skin_type': data.get('skin_type', '복합성'),
             'skin_concerns': data.get('skin_concerns', ''),
             'preferred_brands': data.get('preferred_brand', '라네즈'),

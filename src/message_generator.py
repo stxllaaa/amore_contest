@@ -164,7 +164,7 @@ class MarketingMessageAgent:
             'skin_concerns': persona_data.get('skin_concerns', '수분부족'),
             'preferred_brands': persona_data.get('preferred_brands', '라네즈'),
             'shopping_pattern': '신중형',
-            'price_sensitivity': 'medium',
+            'price_sensitivity': persona_data.get('price_sensitivity', 'medium'),
             'lifestyle_keywords': persona_data.get('lifestyle_keywords', '직장생활, 자기계발'),
             'message_preference': '간결한 정보형',
             'product_category': persona_data.get('product_category', '스킨케어'),
@@ -176,6 +176,8 @@ class MarketingMessageAgent:
             "persona_id": "custom",
             "message_purpose": message_purpose,
             "brand": brand or "",
+            "gender": persona_data.get('gender', '여성'),
+            "price_sensitivity": persona_data.get('price_sensitivity', 'Mid'),
             "persona_data": full_persona_data,  # 직접 데이터 주입
             "use_csv": False,  # CSV를 사용하지 않음을 표시
             "core_needs": [],
