@@ -32,6 +32,7 @@ class VectorStoreManager:
         self.products_store = None
         self.tone_store = None
         self.reviews_store = None
+        self.ingredients_store = None
 
     def build_all_stores(self):
         """모든 벡터 스토어 구축"""
@@ -40,6 +41,7 @@ class VectorStoreManager:
         self.products_store = self._build_products_store()
         self.tone_store = self._build_tone_store()
         self.reviews_store = self._build_reviews_store()
+        self.ingredients_store = self._build_ingredients_store()
 
         self._save_stores()
         print("[Vector Store] 모든 벡터 스토어 구축 완료!")
@@ -147,12 +149,57 @@ class VectorStoreManager:
         print(f"    총 {len(documents)}개의 리뷰 임베딩")
         return FAISS.from_documents(documents, self.embeddings)
 
+    def _build_ingredients_store(self) -> FAISS:
+        """성분 데이터 벡터 스토어 구축"""
+        print("  - 성분 데이터 임베딩 중...")
+        documents = []
+
+        # 성분 CSV 파일 읽기
+        ingredients_file = Path("ingredients_db") / "cosmetic_ingredients.csv"
+
+        # 파일이 없으면 빈 스토어 생성
+        if not ingredients_file.exists():
+            print("    ⚠ 성분 DB 파일이 없습니다. 빈 벡터 스토어 생성")
+            # 더미 문서로 빈 벡터 스토어 생성
+            dummy_doc = Document(
+                page_content="No ingredients data",
+                metadata={"ingredient_id": "dummy"}
+            )
+            return FAISS.from_documents([dummy_doc], self.embeddings)
+
+        df = pd.read_csv(ingredients_file, encoding='utf-8-sig')
+
+        for _, row in df.iterrows():
+            # 성분 정보를 텍스트로 변환
+            text = f"""
+            성분명(한글): {row['ingredient_kor']}
+            성분명(영문): {row['ingredient_eng']}
+            효능: {row['function']}
+            설명: {row['description']}
+            피부 고민: {row['skin_concerns']}
+            """.strip()
+
+            metadata = {
+                "ingredient_id": row['ingredient_id'],
+                "ingredient_eng": row['ingredient_eng'],
+                "ingredient_kor": row['ingredient_kor'],
+                "function": str(row['function']),
+                "description": str(row['description']),
+                "skin_concerns": str(row['skin_concerns'])
+            }
+
+            documents.append(Document(page_content=text, metadata=metadata))
+
+        print(f"    총 {len(documents)}개의 성분 임베딩")
+        return FAISS.from_documents(documents, self.embeddings)
+
     def _save_stores(self):
         """벡터 스토어 저장"""
         print("  - 벡터 스토어 저장 중...")
         self.products_store.save_local(str(self.vector_path / "products"))
         self.tone_store.save_local(str(self.vector_path / "tone"))
         self.reviews_store.save_local(str(self.vector_path / "reviews"))
+        self.ingredients_store.save_local(str(self.vector_path / "ingredients"))
 
     def load_stores(self):
         """저장된 벡터 스토어 로드"""
@@ -174,6 +221,18 @@ class VectorStoreManager:
             allow_dangerous_deserialization=True
         )
 
+        # 성분 벡터 스토어 로드 (선택적)
+        ingredients_path = self.vector_path / "ingredients"
+        if ingredients_path.exists():
+            self.ingredients_store = FAISS.load_local(
+                str(ingredients_path),
+                self.embeddings,
+                allow_dangerous_deserialization=True
+            )
+        else:
+            print("  ⚠ 성분 벡터 스토어가 없습니다")
+            self.ingredients_store = None
+
         print("[Vector Store] 벡터 스토어 로딩 완료!")
 
     def search_products(self, query: str, k: int = 5, filters: Dict = None) -> List[Document]:
@@ -192,3 +251,9 @@ class VectorStoreManager:
     def search_reviews(self, query: str, k: int = 3) -> List[Document]:
         """유사 리뷰 검색"""
         return self.reviews_store.similarity_search(query, k=k)
+
+    def search_ingredients(self, query: str, k: int = 5) -> List[Document]:
+        """성분 검색 (피부 고민 기반)"""
+        if self.ingredients_store is None:
+            return []
+        return self.ingredients_store.similarity_search(query, k=k)

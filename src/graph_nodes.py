@@ -124,12 +124,20 @@ class GraphNodes:
 
         persona = state['persona_data']
 
-        # 브랜드가 지정되지 않은 경우 선호 브랜드에서 선택
+        # 브랜드가 지정되지 않은 경우 선호 브랜드에서 선택 (한글 이름 사용)
         if not state.get('brand'):
             preferred_brands = persona['preferred_brands'].split(',')
             selected_brand_name = preferred_brands[0].strip()
         else:
-            selected_brand_name = state['brand']
+            provided = state['brand']
+            # 입력값이 brand_id(영문)인 경우 한글 brand_name으로 변환
+            if provided and provided in self.brands_df['brand_id'].values:
+                selected_brand_name = self.brands_df[
+                    self.brands_df['brand_id'] == provided
+                ].iloc[0]['brand_name']
+            else:
+                # 이미 한글 브랜드명으로 전달된 경우 그대로 사용
+                selected_brand_name = provided
 
         # 브랜드 정보 로드 (brand_name으로 검색)
         brand_df_filtered = self.brands_df[
@@ -230,10 +238,13 @@ class GraphNodes:
             products.extend(fallback_products[:needed])
             print(f"  [INFO] fallback 제품 {needed}개 추가")
 
-        state['retrieved_products'] = products
+        # 성분 기반 추가 정보 enrichment
+        enriched_products = self._enrich_with_ingredients(products, persona)
 
-        print(f"  [OK] 검색된 제품: {len(products)}개")
-        for p in products:
+        state['retrieved_products'] = enriched_products
+
+        print(f"  [OK] 검색된 제품: {len(enriched_products)}개")
+        for p in enriched_products:
             print(f"    - {p['name']} (카테고리: {p['category']})")
 
         return state
@@ -294,6 +305,63 @@ class GraphNodes:
                 expanded.append(keyword)
 
         return ", ".join(expanded)
+
+    def _enrich_with_ingredients(self, products: list, persona: dict) -> list:
+        """제품에 성분 정보 추가 (피부 고민 기반)"""
+        # 성분 벡터 스토어가 없으면 원본 반환
+        if not self.vector_manager.ingredients_store:
+            return products
+
+        # 피부 고민으로 관련 성분 검색
+        skin_concerns = persona.get('skin_concerns', '')
+        if not skin_concerns:
+            return products
+
+        print(f"  [Ingredients] 피부 고민 '{skin_concerns}'에 맞는 성분 검색 중...")
+
+        # 성분 검색
+        ingredient_results = self.vector_manager.search_ingredients(
+            query=f"{skin_concerns} 피부 고민에 좋은 성분",
+            k=5
+        )
+
+        if not ingredient_results:
+            return products
+
+        # 검색된 성분 정보 정리
+        ingredients_info = []
+        for ing_doc in ingredient_results:
+            ing_name_kor = ing_doc.metadata.get('ingredient_kor', '')
+            ing_name_eng = ing_doc.metadata.get('ingredient_eng', '')
+            ing_function = ing_doc.metadata.get('function', '')
+            ing_description = ing_doc.metadata.get('description', '')
+
+            # function이 비어있으면 description의 첫 100자 사용
+            if not ing_function or ing_function == 'nan':
+                ing_function = ing_description[:100] if ing_description else ''
+
+            if ing_name_kor and ing_name_kor not in ['제목 없음', 'No Title']:
+                ingredients_info.append({
+                    'name': ing_name_kor,
+                    'name_eng': ing_name_eng,
+                    'function': ing_function
+                })
+
+        if ingredients_info:
+            print(f"  [Ingredients] 발견된 성분: {', '.join([i['name'] for i in ingredients_info[:3]])}")
+
+        # 각 제품 설명에 성분 정보 추가
+        for product in products:
+            if ingredients_info:
+                ingredient_text = " | ".join([
+                    f"{ing['name']}({ing['function'][:30]}...)" if len(ing['function']) > 30
+                    else f"{ing['name']}({ing['function']})"
+                    for ing in ingredients_info[:3]
+                ])
+                product['description'] += f"\n\n[추천 성분] {ingredient_text}"
+                product['ingredients'] = ingredients_info[:3]
+
+        return products
 
     def review_context_enricher(self, state: MessageGenerationState) -> MessageGenerationState:
         """노드 4: 리뷰 컨텍스트 추가 - 라이프스타일 키워드 기반"""

@@ -167,6 +167,7 @@ class MarketingMessageAgent:
             'price_sensitivity': 'medium',
             'lifestyle_keywords': persona_data.get('lifestyle_keywords', '직장생활, 자기계발'),
             'message_preference': '간결한 정보형',
+            'product_category': persona_data.get('product_category', '스킨케어'),
             'purchase_history_summary': persona_data.get('product_category', '스킨케어') + ' 관심'
         }
 
