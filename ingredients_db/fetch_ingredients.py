@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 # 공공데이터 API 설정
-API_KEY = "AIzaSyBRm-AG2GM2OKFqhYnYiZvi6DjxhE47yXM"
+API_KEY = "17a1bf44d8263d736313b71b8922a479c9e5b8af16d11c699e64a3b2a1ce7798"
 API_URL = "https://apis.data.go.kr/1471000/CsmtcsIngdCpntInfoService01/getCsmtcsIngdCpntInfoService01"
 
 
