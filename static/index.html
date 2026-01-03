@@ -44,6 +44,32 @@
                             </select>
                         </div>
 
+                        <!-- 성별 선택 -->
+                        <div class="form-group">
+                            <label>성별</label>
+                            <div class="checkbox-grid">
+                                <label class="checkbox-item">
+                                    <input type="radio" name="gender" value="여성" required checked>
+                                    <span>여성</span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="radio" name="gender" value="남성">
+                                    <span>남성</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 가격 민감도 선택 -->
+                        <div class="form-group">
+                            <label for="price_sensitivity">가격 선호도</label>
+                            <select id="price_sensitivity" name="price_sensitivity" required>
+                                <option value="">선택해주세요</option>
+                                <option value="Low">가성비 중시 (합리적인 가격)</option>
+                                <option value="Mid" selected>중간 가격대 (가격 무관)</option>
+                                <option value="High">프리미엄 선호 (고가 제품)</option>
+                            </select>
+                        </div>
+
                         <!-- 선호 키워드 선택 -->
                         <div class="form-group">
                             <label>선호 키워드 (각 카테고리에서 하나씩 선택)</label>

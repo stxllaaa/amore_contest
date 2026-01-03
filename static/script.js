@@ -31,6 +31,8 @@ form.addEventListener('submit', async (e) => {
     // 데이터 객체 생성
     const data = {
         age: parseInt(formData.get('age')),
+        gender: formData.get('gender'),
+        price_sensitivity: formData.get('price_sensitivity'),
         skin_type: formData.get('skin_type'),
         skin_concerns: skinConcerns.join(', '),
         product_category: formData.get('product_category'),
@@ -42,6 +44,14 @@ form.addEventListener('submit', async (e) => {
     // 유효성 검사
     if (!data.age) {
         alert('나이대를 선택해주세요.');
+        return;
+    }
+    if (!data.gender) {
+        alert('성별을 선택해주세요.');
+        return;
+    }
+    if (!data.price_sensitivity) {
+        alert('가격 선호도를 선택해주세요.');
         return;
     }
     if (!weatherKeyword) {
