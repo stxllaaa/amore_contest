@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>아모레퍼시픽 CRM 메시지 생성기</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 헤더 -->
+        <header class="header">
+            <div class="logo-area">
+                <div class="logo-crystal"></div>
+                <h1>아모레퍼시픽 CRM 메시지 생성기</h1>
+            </div>
+            <p class="subtitle">고객님만을 위한 맞춤 메시지를 만들어드립니다</p>
+        </header>
+
+        <!-- 메인 컨텐츠 -->
+        <main class="main-content">
+            <div class="content-grid">
+                <!-- 왼쪽: 페르소나 선택 폼 -->
+                <div class="form-section glass-card">
+                    <h2 class="section-title">
+                        <span class="icon">✨</span>
+                        고객 정보 입력
+                    </h2>
+
+                    <form id="personaForm">
+                        <!-- 나이대 선택 -->
+                        <div class="form-group">
+                            <label for="age">나이대</label>
+                            <select id="age" name="age" required>
+                                <option value="">선택해주세요</option>
+                                <option value="19">10대 (15-19세)</option>
+                                <option value="23">20대 초반 (20-24세)</option>
+                                <option value="27">20대 후반 (25-29세)</option>
+                                <option value="32">30대 초반 (30-34세)</option>
+                                <option value="37">30대 후반 (35-39세)</option>
+                                <option value="42">40대 초반 (40-44세)</option>
+                                <option value="47">40대 후반 (45-49세)</option>
+                                <option value="52">50대 (50세 이상)</option>
+                            </select>
+                        </div>
+
+                        <!-- 직업 선택 -->
+                        <div class="form-group">
+                            <label for="occupation">직업</label>
+                            <select id="occupation" name="occupation" required>
+                                <option value="">선택해주세요</option>
+                                <option value="대학생">대학생</option>
+                                <option value="취업준비생">취업준비생</option>
+                                <option value="회사원">회사원</option>
+                                <option value="전문직">전문직 (의사, 변호사 등)</option>
+                                <option value="프리랜서">프리랜서</option>
+                                <option value="자영업">자영업</option>
+                                <option value="주부">주부</option>
+                                <option value="기타">기타</option>
+                            </select>
+                        </div>
+
+                        <!-- 피부 타입 선택 -->
+                        <div class="form-group">
+                            <label for="skin_type">피부 타입</label>
+                            <select id="skin_type" name="skin_type" required>
+                                <option value="">선택해주세요</option>
+                                <option value="건성">건성</option>
+                                <option value="지성">지성</option>
+                                <option value="복합성">복합성</option>
+                                <option value="민감성">민감성</option>
+                                <option value="중성">중성</option>
+                            </select>
+                        </div>
+
+                        <!-- 피부 고민 선택 (복수 선택) -->
+                        <div class="form-group">
+                            <label>피부 고민 (중복 선택 가능)</label>
+                            <div class="checkbox-grid">
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="skin_concerns" value="모공">
+                                    <span>모공</span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="skin_concerns" value="피지">
+                                    <span>피지</span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="skin_concerns" value="건조">
+                                    <span>건조</span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="skin_concerns" value="주름">
+                                    <span>주름</span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="skin_concerns" value="탄력저하">
+                                    <span>탄력저하</span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="skin_concerns" value="칙칙함">
+                                    <span>칙칙함</span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="skin_concerns" value="다크서클">
+                                    <span>다크서클</span>
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="skin_concerns" value="민감함">
+                                    <span>민감함</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 관심 제품 카테고리 -->
+                        <div class="form-group">
+                            <label for="product_category">관심 제품 카테고리</label>
+                            <select id="product_category" name="product_category" required>
+                                <option value="">선택해주세요</option>
+                                <option value="스킨케어">스킨케어</option>
+                                <option value="베이스 메이크업">베이스 메이크업</option>
+                                <option value="립 메이크업">립 메이크업</option>
+                                <option value="아이 메이크업">아이 메이크업</option>
+                                <option value="마스크팩">마스크/팩</option>
+                                <option value="선케어">선케어</option>
+                            </select>
+                        </div>
+
+                        <!-- 선호 브랜드 선택 -->
+                        <div class="form-group">
+                            <label for="preferred_brand">선호 브랜드</label>
+                            <div class="brand-grid">
+                                <label class="brand-item">
+                                    <input type="radio" name="preferred_brand" value="에뛰드" required>
+                                    <div class="brand-card">
+                                        <div class="brand-name">에뛰드</div>
+                                        <div class="brand-desc">발랄하고 트렌디한</div>
+                                    </div>
+                                </label>
+                                <label class="brand-item">
+                                    <input type="radio" name="preferred_brand" value="라네즈">
+                                    <div class="brand-card">
+                                        <div class="brand-name">라네즈</div>
+                                        <div class="brand-desc">친근하고 실용적인</div>
+                                    </div>
+                                </label>
+                                <label class="brand-item">
+                                    <input type="radio" name="preferred_brand" value="헤라">
+                                    <div class="brand-card">
+                                        <div class="brand-name">헤라</div>
+                                        <div class="brand-desc">세련되고 프로페셔널한</div>
+                                    </div>
+                                </label>
+                                <label class="brand-item">
+                                    <input type="radio" name="preferred_brand" value="설화수">
+                                    <div class="brand-card">
+                                        <div class="brand-name">설화수</div>
+                                        <div class="brand-desc">고급스럽고 전통적인</div>
+                                    </div>
+                                </label>
+                                <label class="brand-item">
+                                    <input type="radio" name="preferred_brand" value="아이오페">
+                                    <div class="brand-card">
+                                        <div class="brand-name">아이오페</div>
+                                        <div class="brand-desc">과학적이고 신뢰감 있는</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 제출 버튼 -->
+                        <button type="submit" class="submit-btn" id="generateBtn">
+                            <span class="btn-text">메시지 생성하기</span>
+                            <span class="btn-icon">✨</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- 오른쪽: 결과 표시 -->
+                <div class="result-section">
+                    <!-- 초기 상태 -->
+                    <div id="initialState" class="glass-card result-placeholder">
+                        <div class="placeholder-icon">💌</div>
+                        <h3>맞춤 메시지가 여기에 표시됩니다</h3>
+                        <p>왼쪽 폼을 작성하고 '메시지 생성하기' 버튼을 눌러주세요</p>
+                    </div>
+
+                    <!-- 로딩 상태 -->
+                    <div id="loadingState" class="glass-card result-loading" style="display: none;">
+                        <div class="loading-spinner"></div>
+                        <h3>메시지를 생성하고 있습니다...</h3>
+                        <p>잠시만 기다려주세요</p>
+                    </div>
+
+                    <!-- 결과 표시 -->
+                    <div id="resultState" class="glass-card result-content" style="display: none;">
+                        <div class="result-header">
+                            <h2 class="section-title">
+                                <span class="icon">💌</span>
+                                생성된 메시지
+                            </h2>
+                            <div class="result-brand" id="resultBrand"></div>
+                        </div>
+
+                        <div class="message-box">
+                            <div class="message-title-label">제목</div>
+                            <div class="message-title" id="messageTitle"></div>
+                        </div>
+
+                        <div class="message-box">
+                            <div class="message-body-label">본문</div>
+                            <div class="message-body" id="messageBody"></div>
+                        </div>
+
+                        <div class="products-section">
+                            <h3>추천 제품</h3>
+                            <ul class="products-list" id="productsList"></ul>
+                        </div>
+
+                        <button class="retry-btn" onclick="resetForm()">
+                            <span>다시 생성하기</span>
+                        </button>
+                    </div>
+
+                    <!-- 에러 상태 -->
+                    <div id="errorState" class="glass-card result-error" style="display: none;">
+                        <div class="error-icon">⚠️</div>
+                        <h3>메시지 생성 중 오류가 발생했습니다</h3>
+                        <p id="errorMessage"></p>
+                        <button class="retry-btn" onclick="resetForm()">다시 시도하기</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 푸터 -->
+        <footer class="footer">
+            <p>© 2024 아모레퍼시픽 CRM 마케팅 메시지 생성 시스템</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
