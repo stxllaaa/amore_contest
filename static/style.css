@@ -181,6 +181,32 @@ body {
     color: var(--text-primary);
 }
 
+/* 라디오 버튼 스타일 */
+.checkbox-item input[type="radio"] {
+    margin-right: 8px;
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-color);
+}
+
+/* 키워드 카테고리 */
+.keyword-category {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 12px;
+    border: 1px solid rgba(127, 168, 232, 0.15);
+}
+
+.keyword-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent-color);
+    margin-bottom: 10px;
+    padding-left: 5px;
+}
+
 /* 브랜드 그리드 */
 .brand-grid {
     display: grid;

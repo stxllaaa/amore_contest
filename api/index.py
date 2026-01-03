@@ -64,12 +64,11 @@ def generate_message():
         persona_data = {
             'age': data.get('age'),
             'gender': data.get('gender', 'F'),
-            'occupation': data.get('occupation', '직장인'),
             'skin_type': data.get('skin_type', '복합성'),
             'skin_concerns': data.get('skin_concerns', ''),
             'preferred_brands': data.get('preferred_brand', '라네즈'),
             'lifestyle_keywords': ', '.join(data.get('lifestyle_keywords', [])),
-            'product_category': data.get('product_category', '스킨케어'),
+            'product_category': data.get('product_category', 'skin'),
         }
 
         message_purpose = data.get('message_purpose', 'personalized')

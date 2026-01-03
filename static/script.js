@@ -18,15 +18,24 @@ form.addEventListener('submit', async (e) => {
         skinConcerns.push(checkbox.value);
     });
 
+    // 선호 키워드 수집
+    const preferredKeywords = [];
+    const weatherKeyword = formData.get('weather_keyword');
+    const toneKeyword = formData.get('tone_keyword');
+    const usageKeyword = formData.get('usage_keyword');
+
+    if (weatherKeyword) preferredKeywords.push(weatherKeyword);
+    if (toneKeyword) preferredKeywords.push(toneKeyword);
+    if (usageKeyword) preferredKeywords.push(usageKeyword);
+
     // 데이터 객체 생성
     const data = {
         age: parseInt(formData.get('age')),
-        occupation: formData.get('occupation'),
         skin_type: formData.get('skin_type'),
         skin_concerns: skinConcerns.join(', '),
         product_category: formData.get('product_category'),
         preferred_brand: formData.get('preferred_brand'),
-        lifestyle_keywords: [formData.get('occupation')],  // 직업을 라이프스타일 키워드로 사용
+        lifestyle_keywords: preferredKeywords,  // 선호 키워드 사용
         message_purpose: 'personalized'
     };
 
@@ -35,8 +44,16 @@ form.addEventListener('submit', async (e) => {
         alert('나이대를 선택해주세요.');
         return;
     }
-    if (!data.occupation) {
-        alert('직업을 선택해주세요.');
+    if (!weatherKeyword) {
+        alert('날씨 키워드를 선택해주세요.');
+        return;
+    }
+    if (!toneKeyword) {
+        alert('톤 키워드를 선택해주세요.');
+        return;
+    }
+    if (!usageKeyword) {
+        alert('용도 키워드를 선택해주세요.');
         return;
     }
     if (!data.skin_type) {

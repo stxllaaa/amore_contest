@@ -54,15 +54,22 @@ class VectorStoreManager:
         df = pd.read_csv(products_file, encoding='utf-8-sig')
 
         for _, row in df.iterrows():
+            # 가격 파싱 (쉼표 제거)
+            price_str = str(row['price']).replace(',', '').strip()
+            try:
+                price = int(price_str)
+            except:
+                price = 0
+
             # 제품 정보를 텍스트로 변환
             text = f"""
             제품명: {row['product_name']}
             브랜드: {row['brand']}
             카테고리: {row['category']}
-            주성분: {row['main_ingredients']}
-            가격: {row['price']:,}원
-            긍정 키워드: {row['top_good_keywords']}
-            부정 키워드: {row['top_bad_keywords']}
+            주성분: {row.get('main_ingredients', 'N/A')}
+            가격: {price:,}원
+            긍정 키워드: {row.get('good', 'N/A')}
+            부정 키워드: {row.get('bad', 'N/A')}
             """.strip()
 
             metadata = {
@@ -70,9 +77,9 @@ class VectorStoreManager:
                 "product_name": row['product_name'],
                 "brand": row['brand'],
                 "category": row['category'],
-                "price": int(row['price']),
-                "top_good_keywords": row['top_good_keywords'],
-                "top_bad_keywords": row['top_bad_keywords']
+                "price": price,
+                "good_keywords": str(row.get('good', '')),
+                "bad_keywords": str(row.get('bad', ''))
             }
 
             documents.append(Document(page_content=text, metadata=metadata))
@@ -109,30 +116,35 @@ class VectorStoreManager:
         reviews_file = self.db_path / "reviews_db" / "all_reviews.csv"
         df = pd.read_csv(reviews_file, encoding='utf-8-sig')
 
-        # lifestyle 컬럼이 있는 리뷰만 선택 (라이프스타일이 풍부한 리뷰)
-        lifestyle_reviews = df[df['lifestyle'].notna() & (df['lifestyle'] != '')]
+        # lifestyle 컬럼 파싱 (문자열 리스트 형식)
+        for _, row in df.iterrows():
+            lifestyle_str = str(row.get('lifestyle', ''))
 
-        for _, row in lifestyle_reviews.iterrows():
+            # 빈 값이나 "[]" 형태는 스킵
+            if not lifestyle_str or lifestyle_str == '[]' or lifestyle_str.lower() == 'nan':
+                continue
+
             # 리뷰 텍스트에 라이프스타일 컨텍스트 추가
-            enriched_text = f"{row['review_text']} [라이프스타일: {row['lifestyle']}]"
+            enriched_text = f"{row['review_text']} [라이프스타일: {lifestyle_str}]"
 
             metadata = {
                 "product_id": row['product_id'],
                 "brand": row['brand'],
-                "age_group": row['age_group'],
-                "gender": row['gender'],
-                "skin_type": row['skin_type'],
-                "skin_concerns": row['skin_concerns'],
-                "category": row['category'],
-                "good_keywords": row['good'],
-                "bad_keywords": row['bad'],
-                "lifestyle": row['lifestyle']
+                "age_group": row.get('age_group', ''),
+                "gender": row.get('gender', ''),
+                "skin_type": row.get('skin_type', ''),
+                "skin_concerns": row.get('skin_concerns', ''),
+                "category": row.get('category', ''),
+                "good_keywords": str(row.get('good', '')),
+                "bad_keywords": str(row.get('bad', '')),
+                "lifestyle": lifestyle_str
             }
 
             documents.append(
                 Document(page_content=enriched_text, metadata=metadata)
             )
 
+        print(f"    총 {len(documents)}개의 리뷰 임베딩")
         return FAISS.from_documents(documents, self.embeddings)
 
     def _save_stores(self):

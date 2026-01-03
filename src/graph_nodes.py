@@ -149,42 +149,165 @@ class GraphNodes:
         return state
 
     def product_retriever(self, state: MessageGenerationState) -> MessageGenerationState:
-        """노드 3: 제품 검색 (RAG)"""
+        """노드 3: 제품 검색 (RAG) - 카테고리 우선 매칭 + 키워드 의미 기반 매칭"""
         print("\n[3. Product Retriever] 제품 검색 중...")
 
         persona = state['persona_data']
 
-        # 검색 쿼리 생성
-        query = f"{persona['skin_type']} 피부, {persona['skin_concerns']} 고민, {', '.join(state['core_needs'])}"
+        # 사용자가 선택한 카테고리 (필수)
+        preferred_category = persona.get('product_category', '')
+        print(f"  [DEBUG] 선호 카테고리: {preferred_category}")
 
-        # Vector search (더 많은 결과를 가져와서 브랜드 필터링)
-        results = self.vector_manager.search_products(query, k=20)
+        if not preferred_category:
+            print(f"  [WARNING] 선호 카테고리가 지정되지 않았습니다.")
 
-        # 선택된 브랜드의 제품만 필터링
+        # 라이프스타일 키워드 확장 (의미 기반 매칭 - 더 넓은 범위)
+        lifestyle_keywords = persona.get('lifestyle_keywords', '')
+        expanded_query = self._expand_lifestyle_keywords(lifestyle_keywords)
+
+        # 검색 쿼리 생성 (확장된 키워드 포함)
+        query = f"{persona['skin_type']} 피부, {persona['skin_concerns']} 고민, {', '.join(state['core_needs'])}, {expanded_query}"
+
+        print(f"  [DEBUG] 검색 쿼리: {query}")
+
+        # Vector search (더 많은 결과를 가져와서 필터링)
+        results = self.vector_manager.search_products(query, k=50)
+
+        # 선택된 브랜드 + 카테고리의 제품만 엄격하게 필터링
         products = []
+        fallback_products = []  # 카테고리 불일치 제품 (최후의 수단)
+
         for doc in results:
-            if doc.metadata.get('brand') == state['selected_brand']:
+            # 브랜드 매칭 (필수)
+            if doc.metadata.get('brand') != state['selected_brand']:
+                continue
+
+            product_category = doc.metadata.get('category', '')
+
+            # 카테고리 매칭 (최우선)
+            if preferred_category and product_category == preferred_category:
                 products.append({
                     'name': doc.metadata['product_name'],
-                    'category': doc.metadata['category'],
+                    'category': product_category,
                     'description': doc.page_content
                 })
                 if len(products) >= 3:
                     break
+            elif not preferred_category:
+                # 카테고리 선호가 없는 경우만 다른 카테고리 허용
+                fallback_products.append({
+                    'name': doc.metadata['product_name'],
+                    'category': product_category,
+                    'description': doc.page_content
+                })
+
+        # 선호 카테고리에서 제품을 찾지 못한 경우
+        if len(products) < 3:
+            if len(products) == 0:
+                print(f"  [ERROR] 선호 카테고리({preferred_category})에서 제품을 찾을 수 없습니다.")
+                print(f"  [WARNING] 검색 쿼리를 더 넓혀서 재시도합니다.")
+
+                # 더 넓은 쿼리로 재검색 (라이프스타일 키워드만 사용)
+                broad_query = f"{expanded_query}, {persona['skin_type']}"
+                broad_results = self.vector_manager.search_products(broad_query, k=100)
+
+                for doc in broad_results:
+                    if doc.metadata.get('brand') == state['selected_brand'] and \
+                       doc.metadata.get('category') == preferred_category:
+                        products.append({
+                            'name': doc.metadata['product_name'],
+                            'category': doc.metadata['category'],
+                            'description': doc.page_content
+                        })
+                        if len(products) >= 3:
+                            break
+            else:
+                print(f"  [INFO] 선호 카테고리({preferred_category})에서 {len(products)}개만 발견")
+
+        # 여전히 부족하면 fallback 사용 (카테고리 선호가 없는 경우만)
+        if len(products) < 3 and not preferred_category and fallback_products:
+            needed = 3 - len(products)
+            products.extend(fallback_products[:needed])
+            print(f"  [INFO] fallback 제품 {needed}개 추가")
 
         state['retrieved_products'] = products
 
         print(f"  [OK] 검색된 제품: {len(products)}개")
+        for p in products:
+            print(f"    - {p['name']} (카테고리: {p['category']})")
+
         return state
 
+    def _expand_lifestyle_keywords(self, lifestyle_keywords: str) -> str:
+        """라이프스타일 키워드를 의미적으로 확장 (더 넓은 범위)"""
+        # 키워드 매핑 딕셔너리 (유사 의미 단어들 - 확장판)
+        keyword_mapping = {
+            # 날씨 관련
+            "더운 날씨": [
+                "여름", "더위", "무더위", "열감", "땀", "시원한", "쿨링", "상쾌한",
+                "청량", "화끈", "뜨거운", "햇빛", "자외선", "열", "더운",
+                "여름철", "여름에", "덥고", "날씨가 더워", "날씨 덥"
+            ],
+            "추운 날씨": [
+                "겨울", "추위", "건조", "갑작스런 날씨", "날씨 변화", "보습", "촉촉",
+                "차가운", "찬바람", "추운", "겨울철", "겨울에", "한파", "쌀쌀",
+                "날씨 추", "날씨가 추워", "추워서", "춥고", "건조한"
+            ],
+            "건조한 날씨": [
+                "건조", "건성", "수분", "보습", "촉촉", "당김",
+                "푸석", "거친", "각질", "트고", "갈라지고", "건조해서",
+                "건조한", "수분 부족", "속건조", "날씨 건조", "건조함"
+            ],
+
+            # 톤 관련
+            "쿨톤": [
+                "차가운 톤", "블루 베이스", "핑크", "시원한 색감",
+                "쿨", "청량", "푸른", "차분한", "핑크빛", "로즈", "퍼플"
+            ],
+            "웜톤": [
+                "따뜻한 톤", "옐로우 베이스", "오렌지", "따뜻한 색감",
+                "웜", "노란", "황금", "코랄", "피치", "베이지", "따스한"
+            ],
+
+            # 용도 관련
+            "선물용": [
+                "선물", "gift", "기프트", "특별한", "프리미엄",
+                "고급", "럭셔리", "기념일", "생일", "어버이날", "발렌타인",
+                "화이트데이", "크리스마스", "이벤트", "선물하기", "선물 받"
+            ],
+            "데일리 케어": [
+                "데일리", "매일", "일상", "daily", "꾸준히", "1일1팩", "루틴",
+                "평소", "자주", "계속", "꾸준", "습관", "반복", "일상적",
+                "매일매일", "매일 사용", "날마다", "매번", "항상", "기본"
+            ]
+        }
+
+        # 키워드 확장
+        expanded = []
+        for keyword in lifestyle_keywords.split(','):
+            keyword = keyword.strip()
+            if keyword in keyword_mapping:
+                # 원본 키워드도 포함
+                expanded.append(keyword)
+                expanded.extend(keyword_mapping[keyword])
+            else:
+                expanded.append(keyword)
+
+        return ", ".join(expanded)
+
     def review_context_enricher(self, state: MessageGenerationState) -> MessageGenerationState:
-        """노드 4: 리뷰 컨텍스트 추가"""
+        """노드 4: 리뷰 컨텍스트 추가 - 라이프스타일 키워드 기반"""
         print("\n[4. Review Context Enricher] 리뷰 분석 중...")
 
         persona = state['persona_data']
 
-        # 유사 리뷰 검색
-        query = f"{persona['age']}세 {persona['occupation']} {persona['lifestyle_keywords']}"
+        # 라이프스타일 키워드 확장
+        lifestyle_keywords = persona.get('lifestyle_keywords', '')
+        expanded_query = self._expand_lifestyle_keywords(lifestyle_keywords)
+
+        # 유사 리뷰 검색 (확장된 키워드로)
+        query = f"{persona['age']}세 {persona['skin_type']} {expanded_query}"
+        print(f"  [DEBUG] 리뷰 검색 쿼리: {query}")
         review_results = self.vector_manager.search_reviews(query, k=3)
 
         reviews_text = "\n".join([doc.page_content for doc in review_results])
@@ -193,8 +316,8 @@ class GraphNodes:
         prompt = REVIEW_ENRICHER_PROMPT.format(
             reviews=reviews_text,
             age=persona['age'],
-            occupation=persona['occupation'],
-            lifestyle_keywords=persona['lifestyle_keywords']
+            occupation=persona.get('occupation', ''),
+            lifestyle_keywords=lifestyle_keywords
         )
 
         messages = [HumanMessage(content=prompt)]
@@ -259,12 +382,12 @@ class GraphNodes:
             brand_name=brand_info['brand_name'],
             target_age=brand_info['target_age'],
             brand_concept=brand_info['brand_concept'],
-            persona_name=persona['persona_name'],
+            persona_name=persona.get('persona_name', '고객님'),
             age=persona['age'],
-            gender='여성' if persona['gender'] == 'F' else '남성',
-            occupation=persona['occupation'],
+            gender='여성' if persona.get('gender', 'F') == 'F' else '남성',
+            occupation=persona.get('occupation', ''),
             skin_concerns=persona['skin_concerns'],
-            lifestyle_keywords=persona['lifestyle_keywords'],
+            lifestyle_keywords=persona.get('lifestyle_keywords', ''),
             products=products_text,
             tone_examples=tone_text,
             empathy_points=", ".join(state['empathy_points']),
