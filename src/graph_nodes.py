@@ -178,20 +178,32 @@ class GraphNodes:
 
         # 3. 성분 검색 (피부 고민 기반)
         ingredients_query = f"{persona['skin_concerns']} 개선, {', '.join(state['core_needs'])}"
+        print(f"  [성분 검색 쿼리] {ingredients_query}")
+
         ingredient_results = self.vector_manager.search_ingredients(ingredients_query, k=5)
 
         recommended_ingredients = []
         if ingredient_results:
-            for doc in ingredient_results:
-                recommended_ingredients.append({
+            print(f"\n  ┌─── 추천 성분 목록 ───")
+            for idx, doc in enumerate(ingredient_results, 1):
+                ing_data = {
                     'name_kor': doc.metadata.get('ingredient_kor', ''),
                     'name_eng': doc.metadata.get('ingredient_eng', ''),
                     'function': doc.metadata.get('function', ''),
                     'skin_concerns': doc.metadata.get('skin_concerns', '')
-                })
-            print(f"  [OK] 추천 성분: {len(recommended_ingredients)}개")
+                }
+                recommended_ingredients.append(ing_data)
+
+                # 터미널 출력
+                print(f"  │ [{idx}] {ing_data['name_kor']} ({ing_data['name_eng']})")
+                print(f"  │     효능: {ing_data['function'][:60]}...")
+                print(f"  │     피부고민: {ing_data['skin_concerns']}")
+                if idx < len(ingredient_results):
+                    print(f"  │")
+            print(f"  └─────────────────────")
+            print(f"  [OK] 총 {len(recommended_ingredients)}개 성분 추천됨")
         else:
-            print(f"  [참고] 성분 DB 없음")
+            print(f"  [참고] 성분 DB 없음 (성분 검색 건너뜀)")
 
         state['recommended_ingredients'] = recommended_ingredients
 
@@ -275,13 +287,16 @@ class GraphNodes:
         ingredients_text = ""
         if state.get('recommended_ingredients'):
             ingredients_list = []
-            for ing in state['recommended_ingredients'][:3]:  # 상위 3개만
+            print(f"\n  [메시지에 포함될 성분]")
+            for idx, ing in enumerate(state['recommended_ingredients'][:3], 1):  # 상위 3개만
                 ingredients_list.append(
                     f"- {ing['name_kor']} ({ing['name_eng']}): {ing['function']}"
                 )
+                print(f"    {idx}. {ing['name_kor']} - {ing['function'][:50]}...")
             ingredients_text = "\n".join(ingredients_list)
         else:
             ingredients_text = "(성분 정보 없음)"
+            print(f"  [참고] 성분 정보 없음 (기본 메시지 생성)")
 
         # 톤 예시 포맷팅
         tone_text = "\n".join([f"예시{i+1}: {ex}" for i, ex in enumerate(state['tone_examples'])])
