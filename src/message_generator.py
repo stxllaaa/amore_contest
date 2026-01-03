@@ -93,6 +93,7 @@ class MarketingMessageAgent:
             "selected_brand": "",
             "brand_info": {},
             "retrieved_products": [],
+            "recommended_ingredients": [],  # 추천 성분 추가
             "empathy_points": [],
             "tone_examples": [],
             "title": "",
@@ -182,6 +183,7 @@ class MarketingMessageAgent:
             "selected_brand": "",
             "brand_info": {},
             "retrieved_products": [],
+            "recommended_ingredients": [],  # 추천 성분 추가
             "empathy_points": [],
             "tone_examples": [],
             "title": "",

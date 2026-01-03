@@ -28,6 +28,7 @@ class MessageGenerationState(TypedDict):
     selected_brand: str
     brand_info: Dict
     retrieved_products: List[Dict]
+    recommended_ingredients: List[Dict]  # 추천 성분 추가
     empathy_points: List[str]
     tone_examples: List[str]
 
@@ -149,15 +150,15 @@ class GraphNodes:
         return state
 
     def product_retriever(self, state: MessageGenerationState) -> MessageGenerationState:
-        """노드 3: 제품 검색 (RAG)"""
-        print("\n[3. Product Retriever] 제품 검색 중...")
+        """노드 3: 제품 검색 (RAG) + 성분 매칭"""
+        print("\n[3. Product Retriever] 제품 및 성분 검색 중...")
 
         persona = state['persona_data']
 
-        # 검색 쿼리 생성
+        # 1. 제품 검색 쿼리 생성
         query = f"{persona['skin_type']} 피부, {persona['skin_concerns']} 고민, {', '.join(state['core_needs'])}"
 
-        # Vector search (더 많은 결과를 가져와서 브랜드 필터링)
+        # 2. 제품 Vector search
         results = self.vector_manager.search_products(query, k=20)
 
         # 선택된 브랜드의 제품만 필터링
@@ -173,8 +174,27 @@ class GraphNodes:
                     break
 
         state['retrieved_products'] = products
-
         print(f"  [OK] 검색된 제품: {len(products)}개")
+
+        # 3. 성분 검색 (피부 고민 기반)
+        ingredients_query = f"{persona['skin_concerns']} 개선, {', '.join(state['core_needs'])}"
+        ingredient_results = self.vector_manager.search_ingredients(ingredients_query, k=5)
+
+        recommended_ingredients = []
+        if ingredient_results:
+            for doc in ingredient_results:
+                recommended_ingredients.append({
+                    'name_kor': doc.metadata.get('ingredient_kor', ''),
+                    'name_eng': doc.metadata.get('ingredient_eng', ''),
+                    'function': doc.metadata.get('function', ''),
+                    'skin_concerns': doc.metadata.get('skin_concerns', '')
+                })
+            print(f"  [OK] 추천 성분: {len(recommended_ingredients)}개")
+        else:
+            print(f"  [참고] 성분 DB 없음")
+
+        state['recommended_ingredients'] = recommended_ingredients
+
         return state
 
     def review_context_enricher(self, state: MessageGenerationState) -> MessageGenerationState:
@@ -251,10 +271,22 @@ class GraphNodes:
             for p in state['retrieved_products']
         ])
 
+        # 성분 정보 포맷팅
+        ingredients_text = ""
+        if state.get('recommended_ingredients'):
+            ingredients_list = []
+            for ing in state['recommended_ingredients'][:3]:  # 상위 3개만
+                ingredients_list.append(
+                    f"- {ing['name_kor']} ({ing['name_eng']}): {ing['function']}"
+                )
+            ingredients_text = "\n".join(ingredients_list)
+        else:
+            ingredients_text = "(성분 정보 없음)"
+
         # 톤 예시 포맷팅
         tone_text = "\n".join([f"예시{i+1}: {ex}" for i, ex in enumerate(state['tone_examples'])])
 
-        # 프롬프트 생성
+        # 프롬프트 생성 (성분 정보 추가)
         prompt = MESSAGE_GENERATOR_PROMPT.format(
             brand_name=brand_info['brand_name'],
             target_age=brand_info['target_age'],
@@ -275,6 +307,10 @@ class GraphNodes:
                 state['selected_brand'], "친근한 톤"
             )
         )
+
+        # 성분 정보를 프롬프트에 추가 (제품 정보 다음)
+        if ingredients_text != "(성분 정보 없음)":
+            prompt += f"\n\n추천 성분 (참고):\n{ingredients_text}\n위 성분의 효능을 메시지에 자연스럽게 녹여서 작성하세요."
 
         # LLM 호출
         messages = [
