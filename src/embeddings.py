@@ -45,85 +45,93 @@ class VectorStoreManager:
         print("[Vector Store] 모든 벡터 스토어 구축 완료!")
 
     def _build_products_store(self) -> FAISS:
-        """제품 데이터 벡터 스토어 구축"""
+        """제품 데이터 벡터 스토어 구축 (통합 CSV 사용)"""
         print("  - 제품 데이터 임베딩 중...")
         documents = []
 
-        products_dir = self.db_path / "products_db"
-        for csv_file in products_dir.glob("*_products.csv"):
-            df = pd.read_csv(csv_file, encoding='utf-8-sig')
+        # 통합 products CSV 파일 읽기
+        products_file = self.db_path / "products_db" / "all_products.csv"
+        df = pd.read_csv(products_file, encoding='utf-8-sig')
 
-            for _, row in df.iterrows():
-                # 제품 정보를 텍스트로 변환
-                text = f"""
-                제품명: {row['product_name']}
-                카테고리: {row['category']}
-                설명: {row['description']}
-                주성분: {row['main_ingredients']}
-                피부타입: {row['target_skin_type']}
-                가격: {row['price']:,}원
-                """.strip()
+        for _, row in df.iterrows():
+            # 제품 정보를 텍스트로 변환
+            text = f"""
+            제품명: {row['product_name']}
+            브랜드: {row['brand']}
+            카테고리: {row['category']}
+            주성분: {row['main_ingredients']}
+            가격: {row['price']:,}원
+            긍정 키워드: {row['top_good_keywords']}
+            부정 키워드: {row['top_bad_keywords']}
+            """.strip()
 
-                metadata = {
-                    "product_id": row['product_id'],
-                    "product_name": row['product_name'],
-                    "brand": csv_file.stem.split('_')[0],
-                    "category": row['category'],
-                    "price": int(row['price']),
-                    "skin_type": row['target_skin_type']
-                }
+            metadata = {
+                "product_id": row['product_id'],
+                "product_name": row['product_name'],
+                "brand": row['brand'],
+                "category": row['category'],
+                "price": int(row['price']),
+                "top_good_keywords": row['top_good_keywords'],
+                "top_bad_keywords": row['top_bad_keywords']
+            }
 
-                documents.append(Document(page_content=text, metadata=metadata))
+            documents.append(Document(page_content=text, metadata=metadata))
 
         return FAISS.from_documents(documents, self.embeddings)
 
     def _build_tone_store(self) -> FAISS:
-        """브랜드 톤 코퍼스 벡터 스토어 구축"""
+        """브랜드 톤 코퍼스 벡터 스토어 구축 (marketing_tone_info.xlsx 사용)"""
         print("  - 브랜드 톤 데이터 임베딩 중...")
         documents = []
 
-        tone_dir = self.db_path / "brand_tone_corpus"
-        for csv_file in tone_dir.glob("*_tone_texts.csv"):
-            df = pd.read_csv(csv_file, encoding='utf-8-sig')
-            brand = csv_file.stem.split('_')[0]
+        # marketing_tone_info.xlsx 파일 읽기
+        tone_file = self.db_path / "brand_tone_corpus" / "marketing_tone_info.xlsx"
+        df = pd.read_excel(tone_file)
 
-            for _, row in df.iterrows():
-                metadata = {
-                    "brand": brand,
-                    "source": row['source'],
-                    "tone_features": row['tone_features']
-                }
+        for _, row in df.iterrows():
+            metadata = {
+                "brand": row['brand'],
+                "platform": row['platform']
+            }
 
-                documents.append(
-                    Document(page_content=row['text_content'], metadata=metadata)
-                )
+            documents.append(
+                Document(page_content=row['tone_text'], metadata=metadata)
+            )
 
         return FAISS.from_documents(documents, self.embeddings)
 
     def _build_reviews_store(self) -> FAISS:
-        """리뷰 데이터 벡터 스토어 구축 (라이프스타일 리치만)"""
+        """리뷰 데이터 벡터 스토어 구축 (통합 CSV 사용)"""
         print("  - 리뷰 데이터 임베딩 중...")
         documents = []
 
-        reviews_dir = self.db_path / "reviews_db"
-        for csv_file in reviews_dir.glob("*_reviews.csv"):
-            df = pd.read_csv(csv_file, encoding='utf-8-sig')
+        # 통합 reviews CSV 파일 읽기
+        reviews_file = self.db_path / "reviews_db" / "all_reviews.csv"
+        df = pd.read_csv(reviews_file, encoding='utf-8-sig')
 
-            # is_lifestyle_rich가 True인 리뷰만 선택
-            lifestyle_reviews = df[df['is_lifestyle_rich'] == True]
+        # lifestyle 컬럼이 있는 리뷰만 선택 (라이프스타일이 풍부한 리뷰)
+        lifestyle_reviews = df[df['lifestyle'].notna() & (df['lifestyle'] != '')]
 
-            for _, row in lifestyle_reviews.iterrows():
-                metadata = {
-                    "product_id": '_'.join(csv_file.stem.split('_')[:-1]),
-                    "age_group": row['age_group'],
-                    "gender": row['gender'],
-                    "skin_type": row['skin_type'],
-                    "rating": int(row['rating'])
-                }
+        for _, row in lifestyle_reviews.iterrows():
+            # 리뷰 텍스트에 라이프스타일 컨텍스트 추가
+            enriched_text = f"{row['review_text']} [라이프스타일: {row['lifestyle']}]"
 
-                documents.append(
-                    Document(page_content=row['review_text'], metadata=metadata)
-                )
+            metadata = {
+                "product_id": row['product_id'],
+                "brand": row['brand'],
+                "age_group": row['age_group'],
+                "gender": row['gender'],
+                "skin_type": row['skin_type'],
+                "skin_concerns": row['skin_concerns'],
+                "category": row['category'],
+                "good_keywords": row['good'],
+                "bad_keywords": row['bad'],
+                "lifestyle": row['lifestyle']
+            }
+
+            documents.append(
+                Document(page_content=enriched_text, metadata=metadata)
+            )
 
         return FAISS.from_documents(documents, self.embeddings)
 
