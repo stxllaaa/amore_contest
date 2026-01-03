@@ -25,7 +25,7 @@ vercel
 ```
 
 2. 프롬프트에 따라 설정 진행
-3. 환경 변수 설정:
+4. 환경 변수 설정:
 
 ```bash
 vercel env add GOOGLE_API_KEY

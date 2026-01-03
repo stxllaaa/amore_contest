@@ -98,7 +98,7 @@ vercel --prod
 - **Flask**: 웹 프레임워크
 - **LangChain**: LLM 통합
 - **LangGraph**: 워크플로우 관리
-- **Google Gemini**: AI 모델 (gemini-2.5-flash)
+- **Google Gemini**: AI 모델 (e.g. `models/gemini-2.5-flash`)
 - **FAISS**: 벡터 검색
 
 ### Frontend

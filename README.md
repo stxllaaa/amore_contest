@@ -41,9 +41,9 @@ LangGraph와 RAG 기술을 활용한 개인화 마케팅 메시지 자동 생성
                 ┌───────────────────────────┐
                 │    FAISS Vector Stores     │
                 ├───────────────────────────┤
-                │  • Products (75개 제품)    │
-                │  • Tone Corpus (75개 예시) │
-                │  • Reviews (180개 리뷰)    │
+                │  • products (brands_db/products_db/all_products.csv)
+                │  • tone (brands_db/brand_tone_corpus/marketing_tone_info.xlsx)
+                │  • reviews (brands_db/reviews_db/all_reviews.csv)
                 └───────────────────────────┘
 ```
 
@@ -52,13 +52,13 @@ LangGraph와 RAG 기술을 활용한 개인화 마케팅 메시지 자동 생성
 ### 1. 필수 요구사항
 
 - Python 3.9 이상
-- OpenAI API 키
+- Google Gemini API 키 (`GOOGLE_API_KEY`), 또는 Gemini 접근 권한
 
 ### 2. 저장소 클론 및 패키지 설치
 
 ```bash
 # 저장소 클론 (또는 프로젝트 디렉토리로 이동)
-cd amore
+cd amore_contest
 
 # 가상환경 생성 (권장)
 python -m venv venv
@@ -79,8 +79,8 @@ pip install -r requirements.txt
 # .env 파일 생성
 cp .env.example .env
 
-# .env 파일 편집하여 OpenAI API 키 입력
-# OPENAI_API_KEY=sk-your-api-key-here
+# .env 파일 편집하여 Google API 키 입력
+# GOOGLE_API_KEY=your-google-api-key-here
 ```
 
 ## 프로젝트 구조
@@ -88,23 +88,13 @@ cp .env.example .env
 ```
 amore/
 ├── brands_db/                    # 브랜드 데이터베이스
-│   ├── brand_info.csv           # 5개 브랜드 정보
-│   ├── products_db/             # 브랜드별 제품 데이터 (75개 제품)
-│   │   ├── etude_products.csv
-│   │   ├── laneige_products.csv
-│   │   ├── hera_products.csv
-│   │   ├── sulwhasoo_products.csv
-│   │   └── iope_products.csv
-│   ├── brand_tone_corpus/       # 브랜드별 톤 코퍼스 (75개 예시)
-│   │   ├── etude_tone_texts.csv
-│   │   ├── laneige_tone_texts.csv
-│   │   ├── hera_tone_texts.csv
-│   │   ├── sulwhasoo_tone_texts.csv
-│   │   └── iope_tone_texts.csv
-│   └── reviews_db/              # 제품 리뷰 데이터 (180개 리뷰)
-│       ├── etude_001_reviews.csv
-│       ├── etude_002_reviews.csv
-│       └── ... (15개 파일)
+│   ├── brand_info.csv            # 브랜드 메타 정보
+│   ├── products_db/              # 제품 데이터(통합 CSV)
+│   │   └── all_products.csv      # 모든 브랜드/제품을 통합한 파일
+│   ├── brand_tone_corpus/        # 브랜드 톤 코퍼스
+│   │   └── marketing_tone_info.xlsx  # 마케팅 문구 예시 통합 파일
+│   └── reviews_db/               # 리뷰 데이터(통합 CSV)
+│       └── all_reviews.csv       # 모든 리뷰를 통합한 파일 (lifestyle 포함된 리뷰만 사용)
 ├── customers_db/                # 고객 페르소나 데이터
 │   ├── customer_personas.csv   # 8개 페르소나 (CSV)
 │   └── customer_personas.json  # 8개 페르소나 (JSON)
@@ -115,10 +105,25 @@ amore/
 │   ├── graph_nodes.py          # LangGraph 노드 구현
 │   ├── graph_builder.py        # LangGraph 워크플로우
 │   └── message_generator.py    # 메인 에이전트
-├── tests/                       # 테스트 코드
+├── tests/                        # 테스트 코드
 │   ├── __init__.py
 │   └── test_generator.py
-├── vector_store/                # FAISS 벡터 스토어 (자동 생성)
+├── vector_store/                 # FAISS 벡터 스토어 (빌드 시 생성)
+│   ├── products/
+│   │   └── index.faiss
+│   ├── tone/
+│   │   └── index.faiss
+│   └── reviews/
+│       └── index.faiss
+├── api/                          # Vercel serverless API 핸들러
+│   └── index.py
+├── static/                       # 웹 데모 정적 파일
+│   ├── index.html
+│   ├── script.js
+│   └── style.css
+├── app.py
+├── demo.py
+├── quickstart.py
 ├── requirements.txt
 ├── .env.example
 └── README.md
@@ -282,9 +287,9 @@ python tests/test_generator.py
 - 출력: 브랜드 톤앤매너 예시
 
 ### 6. Message Generator (메시지 생성)
-- 입력: 모든 수집된 컨텍스트
-- 처리: GPT-4o-mini로 제목+본문 생성
-- 출력: 제목 (40자 이내), 본문 (350자 이내)
+# 입력: 모든 수집된 컨텍스트
+# 처리: Google Gemini (예: `models/gemini-2.5-flash`)으로 제목+본문 생성
+# 출력: 제목 (40자 이내), 본문 (350자 이내)
 
 ### 7. Quality Validator (품질 검증)
 - 입력: 생성된 메시지
@@ -295,8 +300,8 @@ python tests/test_generator.py
 
 - **LangChain**: LLM 통합 및 체인 구성
 - **LangGraph**: 상태 기반 워크플로우 관리
-- **OpenAI GPT-4o-mini**: 메시지 생성 LLM
-- **OpenAI Embeddings**: text-embedding-3-small
+- **Google Gemini**: 메시지 생성 LLM (예: `models/gemini-2.5-flash`)
+- **Google Generative Embeddings**: `models/text-embedding-004`
 - **FAISS**: 벡터 유사도 검색
 - **Pandas**: 데이터 처리
 - **Python-dotenv**: 환경 변수 관리
@@ -306,12 +311,13 @@ python tests/test_generator.py
 `.env` 파일에서 다음 항목을 설정할 수 있습니다:
 
 ```bash
-# OpenAI API 키 (필수)
-OPENAI_API_KEY=sk-your-api-key-here
+# Google Gemini API 키 (필수)
+GOOGLE_API_KEY=your-google-api-key-here
 
 # 모델 설정
-MODEL_NAME=gpt-4o-mini                      # LLM 모델
-EMBEDDING_MODEL=text-embedding-3-small       # 임베딩 모델
+# 권장: models/gemini-2.5-flash (생성), 임베딩은 models/text-embedding-004
+MODEL_NAME=models/gemini-2.5-flash
+EMBEDDING_MODEL=models/text-embedding-004
 TEMPERATURE=0.7                              # 생성 온도 (0.0-1.0)
 
 # 경로 설정
@@ -378,9 +384,9 @@ agent = MarketingMessageAgent(db_path="./brands_db")
 agent.vector_manager.build_all_stores()
 ```
 
-### 2. OpenAI API 오류
+### 2. Google API 오류
 
-- `.env` 파일에 올바른 API 키가 설정되어 있는지 확인
+- `.env` 파일에 올바른 `GOOGLE_API_KEY`가 설정되어 있는지 확인
 - API 사용량 한도를 초과하지 않았는지 확인
 
 ### 3. 인코딩 오류 (Windows)

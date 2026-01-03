@@ -11,7 +11,7 @@
 cp .env.example .env
 
 # .env 파일 편집하여 Google API Key 입력
-# GOOGLE_API_KEY=your_actual_api_key_here
+# GOOGLE_API_KEY=your-google-api-key-here
 ```
 
 ### 필수 패키지 설치

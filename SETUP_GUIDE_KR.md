@@ -86,7 +86,8 @@ Successfully installed langchain-... faiss-cpu-... pandas-...
 GOOGLE_API_KEY=여기에_실제_API_키_입력
 
 # Model Configuration
-MODEL_NAME=models/gemini-2.0-flash-exp
+# 권장: models/gemini-2.5-flash, 임베딩은 models/text-embedding-004
+MODEL_NAME=models/gemini-2.5-flash
 EMBEDDING_MODEL=models/text-embedding-004
 
 # Vector Store Configuration
