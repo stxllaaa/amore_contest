@@ -38,6 +38,7 @@ class MessageGenerationState(TypedDict):
     body: str
     is_valid: bool
     validation_issues: List[str]
+    retry_count: int  # 재시도 횟수
 
 
 class GraphNodes:
@@ -562,5 +563,7 @@ class GraphNodes:
             print("  [OK] 검증 통과!")
         else:
             print(f"  [FAIL] 검증 실패: {issues}")
+            # 검증 실패 시 재시도 횟수 증가
+            state['retry_count'] = state.get('retry_count', 0) + 1
 
         return state

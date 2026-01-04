@@ -36,17 +36,29 @@ def build_message_generation_graph(db_path: str, vector_manager):
 
     # 조건부 엣지: 검증 결과에 따라 재생성 or 종료
     def should_regenerate(state):
-        """검증 실패 시 재생성, 성공 시 종료"""
+        """검증 실패 시 1회에 한해 재생성, 성공 시 종료"""
+        # 1. 이미 검증 통과했으면 종료
         if state.get('is_valid', True):
             return "end"
+
+        # 2. 검증 실패 시, 재시도 횟수 확인
+        # (quality_validator에서 이미 1을 증가시켜서 보냄)
+        current_retry = state.get('retry_count', 0)
+
+        if current_retry == 1:
+            # 첫 번째 실패임 -> 재시도
+            print("\n[Self-Correction] 품질 기준 미달로 재생성을 시도합니다...")
+            return "regenerate"
         else:
-            # 간단히 종료 (실제로는 재생성 로직 추가 가능)
+            # 두 번째 실패(1 초과) -> 포기하고 종료
+            print("  [Stop] 재시도 횟수 초과로 프로세스를 종료합니다.")
             return "end"
 
     workflow.add_conditional_edges(
         "quality_validator",
         should_regenerate,
         {
+            "regenerate": "message_generator",
             "end": END
         }
     )

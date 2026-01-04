@@ -98,7 +98,8 @@ class MarketingMessageAgent:
             "title": "",
             "body": "",
             "is_valid": False,
-            "validation_issues": []
+            "validation_issues": [],
+            "retry_count": 0
         }
 
         # 그래프 실행
@@ -190,7 +191,8 @@ class MarketingMessageAgent:
             "title": "",
             "body": "",
             "is_valid": False,
-            "validation_issues": []
+            "validation_issues": [],
+            "retry_count": 0
         }
 
         # 그래프 실행
