@@ -89,23 +89,68 @@ class VectorStoreManager:
         return FAISS.from_documents(documents, self.embeddings)
 
     def _build_tone_store(self) -> FAISS:
-        """브랜드 톤 코퍼스 벡터 스토어 구축 (marketing_tone_info.xlsx 사용)"""
+        """브랜드 톤 코퍼스 벡터 스토어 구축
+
+        시스템은 `marketing_tone_info.csv`를 우선 사용합니다. CSV가 없고
+        `marketing_tone_info.xlsx`가 존재하면 자동으로 CSV로 변환 후 사용합니다.
+        (과거의 per-brand CSV 파일은 더 이상 기본 사용 대상이 아닙니다.)
+        """
         print("  - 브랜드 톤 데이터 임베딩 중...")
         documents = []
 
-        # marketing_tone_info.xlsx 파일 읽기
-        tone_file = self.db_path / "brand_tone_corpus" / "marketing_tone_info.xlsx"
-        df = pd.read_excel(tone_file)
+        tone_dir = self.db_path / "brand_tone_corpus"
+        csv_file = tone_dir / "marketing_tone_info.csv"
+        xlsx_file = tone_dir / "marketing_tone_info.xlsx"
+
+        df = None
+        if csv_file.exists():
+            print(f"    - marketing_tone_info.csv 로드: {csv_file}")
+            df = pd.read_csv(csv_file, encoding='utf-8-sig')
+        elif xlsx_file.exists():
+            print(f"    - marketing_tone_info.xlsx 로드: {xlsx_file} (CSV로 변환합니다)")
+            df = pd.read_excel(xlsx_file)
+            try:
+                df.to_csv(csv_file, index=False, encoding='utf-8-sig')
+                print(f"    - 변환 완료: {csv_file}")
+            except Exception as e:
+                print(f"    ⚠ CSV 변환 실패: {e}")
+        else:
+            # Fallback: deprecated per-brand *_tone_texts.csv 탐색
+            print("    ⚠ 브랜드 톤 파일이 없습니다. per-brand *_tone_texts.csv를 탐색합니다 (권장: marketing_tone_info.csv 사용)")
+            tone_files = list(tone_dir.glob("*_tone_texts.csv"))
+            if tone_files:
+                dfs = []
+                for f in tone_files:
+                    try:
+                        d = pd.read_csv(f, encoding='utf-8-sig')
+                        # 표준 컬럼으로 정제
+                        if 'tone_text' not in d.columns:
+                            # 첫 번째 컬럼을 tone_text로 간주
+                            d = d.rename(columns={d.columns[0]: 'tone_text'})
+                        if 'brand' not in d.columns:
+                            brand_from = f.stem.split('_')[0]
+                            d['brand'] = brand_from
+                        # platform 컬럼이 없으면 공백으로 채움
+                        if 'platform' not in d.columns:
+                            d['platform'] = ''
+                        dfs.append(d[['brand', 'platform', 'tone_text']])
+                    except Exception as e:
+                        print(f"      ⚠ {f} 읽기 실패: {e}")
+                if dfs:
+                    df = pd.concat(dfs, ignore_index=True)
+
+        if df is None or df.empty:
+            print("    ⚠ 브랜드 톤 데이터가 없어 빈 스토어를 생성합니다.")
+            dummy = Document(page_content="No tone data", metadata={"brand": "dummy", "platform": "none"})
+            return FAISS.from_documents([dummy], self.embeddings)
 
         for _, row in df.iterrows():
             metadata = {
-                "brand": row['brand'],
-                "platform": row['platform']
+                "brand": row.get('brand', ''),
+                "platform": row.get('platform', '')
             }
-
-            documents.append(
-                Document(page_content=row['tone_text'], metadata=metadata)
-            )
+            text = str(row.get('tone_text', ''))
+            documents.append(Document(page_content=text, metadata=metadata))
 
         return FAISS.from_documents(documents, self.embeddings)
 

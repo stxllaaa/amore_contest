@@ -1,6 +1,6 @@
-# 아모레퍼시픽 CRM 마케팅 메시지 자동 생성 시스템
+# 아모레퍼시픽 CRM 마케팅 메시지 생성 시스템
 
-LangGraph와 RAG 기술을 활용한 개인화 마케팅 메시지 자동 생성 시스템입니다.
+아모레퍼시픽 브랜드 데이터를 이용해 고객 페르소나 기반의 개인화 마케팅 메시지(제목 + 본문)를 자동으로 생성하는 시스템입니다. LangGraph 기반 워크플로우와 RAG(벡터 검색)를 활용해 제품 추천, 리뷰 컨텍스트 반영, 브랜드 톤 적용, 품질 검증을 수행합니다.
 
 ## 주요 기능
 
@@ -10,6 +10,16 @@ LangGraph와 RAG 기술을 활용한 개인화 마케팅 메시지 자동 생성
 - **리뷰 컨텍스트 활용**: 유사 고객의 리뷰를 분석하여 공감 포인트 도출
 - **7단계 워크플로우**: LangGraph로 구성된 체계적인 메시지 생성 파이프라인
 - **품질 자동 검증**: 제목/본문 길이, 금칙어, 톤 일관성 자동 체크
+
+## 🔧 핵심 변경 사항
+
+- 데이터는 브랜드별 개별 CSV 대신 통합된 파일을 사용합니다 (자세한 내용은 `DATA_STRUCTURE.md` 참고).
+  - 제품: `brands_db/products_db/all_products.csv`
+  - 리뷰: `brands_db/reviews_db/all_reviews.csv` (※ `lifestyle` 컬럼이 있어야 벡터 스토어에 포함됩니다)
+  - 브랜드 톤: `brands_db/brand_tone_corpus/marketing_tone_info.xlsx` (실제 마케팅 문장 사용)
+- 벡터 스토어는 `src.embeddings.VectorStoreManager`가 생성/로딩합니다. (FAISS 사용)
+
+---
 
 ## 시스템 아키텍처
 
@@ -41,70 +51,73 @@ LangGraph와 RAG 기술을 활용한 개인화 마케팅 메시지 자동 생성
                 ┌───────────────────────────┐
                 │    FAISS Vector Stores     │
                 ├───────────────────────────┤
-                │  • Products (75개 제품)    │
-                │  • Tone Corpus (75개 예시) │
-                │  • Reviews (180개 리뷰)    │
+                │  • Products (92개 제품)    │
+                │  • Tone Corpus (99개 예시) │
+                │  • Reviews (~6,141개 리뷰, 5개 브랜드 통합)    │
                 └───────────────────────────┘
 ```
 
-## 설치 방법
+## 🚀 빠른 시작
 
-### 1. 필수 요구사항
-
-- Python 3.9 이상
-- OpenAI API 키
-
-### 2. 저장소 클론 및 패키지 설치
+1) 의존성 설치
 
 ```bash
-# 저장소 클론 (또는 프로젝트 디렉토리로 이동)
-cd amore
-
-# 가상환경 생성 (권장)
 python -m venv venv
-
-# 가상환경 활성화
-# Windows:
-venv\Scripts\activate
-# Mac/Linux:
 source venv/bin/activate
-
-# 패키지 설치
 pip install -r requirements.txt
 ```
 
-### 3. 환경 변수 설정
+2) 환경 변수 설정
 
 ```bash
-# .env 파일 생성
 cp .env.example .env
+# .env에 OPENAI_API_KEY, GOOGLE_API_KEY 등을 설정하세요
+```
 
-# .env 파일 편집하여 OpenAI API 키 입력
-# OPENAI_API_KEY=sk-your-api-key-here
+3) 로컬 서버 실행 (개발용)
+
+```bash
+python app.py
+# → http://localhost:5000
+```
+
+4) 파이썬 API 사용 예시
+
+```python
+from src.message_generator import MarketingMessageAgent
+agent = MarketingMessageAgent(db_path="./brands_db")
+result = agent.generate_message("persona_001", "personalized")
+print(result)
 ```
 
 ## 프로젝트 구조
+
+---
+
+## 📁 데이터 구조 요약
+
+- `brands_db/`
+  - `brand_info.csv` — 브랜드 메타 정보
+  - `products_db/all_products.csv` — 모든 제품 통합 CSV
+  - `reviews_db/all_reviews.csv` — 통합 리뷰 CSV (벡터화 시 `lifestyle` 필터 적용)
+  - `brand_tone_corpus/marketing_tone_info.xlsx` — 브랜드별 마케팅 문장 (운영 기준: `marketing_tone_info.csv` 사용; XLSX가 있으면 자동 변환)
+  - (참고) per-brand tone CSV는 보관용/레거시이며 시스템은 통합 CSV(`marketing_tone_info.csv`)를 사용합니다
+- `ingredients_db/cosmetic_ingredients.csv` — 성분 데이터 (선택적)
+- `vector_store/` — FAISS 스토어(자동 생성)
+
+자세한 컬럼 및 마이그레이션 가이드는 `DATA_STRUCTURE.md`를 참고하세요.
 
 ```
 amore/
 ├── brands_db/                    # 브랜드 데이터베이스
 │   ├── brand_info.csv           # 5개 브랜드 정보
-│   ├── products_db/             # 브랜드별 제품 데이터 (75개 제품)
-│   │   ├── etude_products.csv
-│   │   ├── laneige_products.csv
-│   │   ├── hera_products.csv
-│   │   ├── sulwhasoo_products.csv
-│   │   └── iope_products.csv
-│   ├── brand_tone_corpus/       # 브랜드별 톤 코퍼스 (75개 예시)
-│   │   ├── etude_tone_texts.csv
-│   │   ├── laneige_tone_texts.csv
-│   │   ├── hera_tone_texts.csv
-│   │   ├── sulwhasoo_tone_texts.csv
-│   │   └── iope_tone_texts.csv
-│   └── reviews_db/              # 제품 리뷰 데이터 (180개 리뷰)
-│       ├── etude_001_reviews.csv
-│       ├── etude_002_reviews.csv
-│       └── ... (15개 파일)
+│   ├── products_db/             # 통합 제품 데이터
+│   │   └── all_products.csv
+│   ├── brand_tone_corpus/       # 브랜드 톤 코퍼스 (마케팅 문장 통합 CSV)
+│   │   ├── marketing_tone_info.xlsx
+│   │   └── marketing_tone_info.csv   # 시스템에서 사용하는 통합 CSV (xlsx → csv 자동 변환)
+│   └── reviews_db/              # 통합 리뷰 데이터 (5개 브랜드 통합, 약 6,141개 리뷰)
+│       └── all_reviews.csv
 ├── customers_db/                # 고객 페르소나 데이터
 │   ├── customer_personas.csv   # 8개 페르소나 (CSV)
 │   └── customer_personas.json  # 8개 페르소나 (JSON)
@@ -195,6 +208,28 @@ result = agent.generate_message(
 
 # 결과: 아이오페 브랜드로 남성 고객 맞춤 메시지
 ```
+
+### Web API
+
+서버를 실행하면 다음 엔드포인트를 사용할 수 있습니다 (Flask 기반):
+
+- `POST /api/generate` — 메시지 생성
+  - 요청 예시 (JSON):
+    ```json
+    {
+      "age": 30,
+      "gender": "여성",
+      "skin_type": "복합성",
+      "product_category": "skin",
+      "message_purpose": "personalized",
+      "brand": "laneige"
+    }
+    ```
+  - 응답: `{ "success": true, "result": { /* 생성 결과 */ } }`
+
+- `GET /api/brands` — 브랜드 목록 반환
+
+- `POST /api/save` — 생성된 마케팅 자산을 CSV로 저장
 
 ### 4. 편의 함수 사용
 
@@ -367,6 +402,12 @@ python evaluation/visualize_results.py      # 시각화만
 - `evaluation/plots/08_comprehensive_dashboard.png` - 종합 대시보드
 
 자세한 내용은 [evaluation/README.md](evaluation/README.md)를 참조하세요.
+
+## 💡 운영/유의사항
+
+- 리뷰는 `lifestyle` 정보가 있는 경우에만 임베딩에 포함됩니다.
+- 브랜드 톤 데이터는 실제 마케팅 문장을 사용하므로 가공에 유의하세요.
+- 벡터 스토어를 재생성하려면 `rm -rf ./vector_store` 후 `VectorStoreManager.build_all_stores()`를 실행하세요.
 
 ## 트러블슈팅
 

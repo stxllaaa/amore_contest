@@ -128,9 +128,9 @@ amore_contest/
 │   └── prompts.py            # 프롬프트 템플릿
 ├── brands_db/                # 브랜드 데이터
 │   ├── brand_info.csv
-│   ├── products_db/          # 제품 정보 (75개)
-│   ├── brand_tone_corpus/    # 브랜드 톤 예시 (75개)
-│   └── reviews_db/           # 리뷰 데이터 (180개)
+│   ├── products_db/          # 제품 정보 (92개)
+│   ├── brand_tone_corpus/    # 브랜드 톤 예시 (99개)
+│   └── reviews_db/           # 리뷰 데이터 (약 6,141개, 5개 브랜드 통합)
 ├── app.py                    # 로컬 개발용 서버
 ├── vercel.json               # Vercel 배포 설정
 ├── requirements.txt          # Python 패키지

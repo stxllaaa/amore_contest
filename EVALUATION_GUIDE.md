@@ -206,7 +206,7 @@ evaluation/
 
 ```python
 # 해당 브랜드의 톤 코퍼스 데이터 보강
-# brand_tone_corpus/[브랜드]_tone_texts.csv에 더 다양한 예시 추가
+# `brand_tone_corpus/marketing_tone_info.csv` (또는 `marketing_tone_info.xlsx`)에 더 다양한 예시 추가
 ```
 
 ### 생성 시간이 너무 긴 경우

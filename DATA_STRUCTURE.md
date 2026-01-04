@@ -33,7 +33,7 @@ etude_skin_1,skin,etude,수분가득 콜라겐 시트 마스크 25ml,504,2500,�
 
 ### 2. reviews_db (리뷰 데이터베이스)
 
-**파일**: `brands_db/reviews_db/all_reviews.csv`
+**파일**: `brands_db/reviews_db/all_reviews.csv` (5개 브랜드의 리뷰를 통합한 단일 CSV)
 
 **컬럼 구조**:
 ```
@@ -65,7 +65,8 @@ etude_skin_1,etude,dusc****,남성,30대,지성,트러블,보습감,촉촉해요
 
 ### 3. brand_tone_corpus (브랜드 톤 코퍼스)
 
-**파일**: `brands_db/brand_tone_corpus/marketing_tone_info.xlsx`
+**파일 (운영 기준)**: `brands_db/brand_tone_corpus/marketing_tone_info.csv`  
+(참고: 기존 수집 포맷인 `marketing_tone_info.xlsx`를 자동으로 CSV로 변환하여 사용합니다)
 
 **컬럼 구조**:
 ```
@@ -81,7 +82,10 @@ platform: instagram
 tone_text: "눈썹 그리기 어려운 사람 집중!!!୧(•̀ө•́)୨
 더욱더 섬세하게 눈썹 메이크오버 할 수 있는
 컨트롤 슬라이드 삼면 브로우🤎🩶🖤..."
-```
+
+**비고**:
+- per-brand `_tone_texts.csv` 파일은 더 이상 시스템의 기본 소스로 사용되지 않습니다(보관용 혹은 레거시). 운영 환경에서는 `marketing_tone_info.csv`를 기준으로 합니다.
+- `src.embeddings.VectorStoreManager._build_tone_store()`는 CSV를 우선 로드하고 없으면 XLSX를 CSV로 변환하여 사용합니다.```
 
 ## 주요 변경사항
 
