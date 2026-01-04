@@ -66,7 +66,7 @@ etude_skin_1,etude,dusc****,남성,30대,지성,트러블,보습감,촉촉해요
 ### 3. brand_tone_corpus (브랜드 톤 코퍼스)
 
 **파일 (운영 기준)**: `brands_db/brand_tone_corpus/marketing_tone_info.csv`  
-(참고: 기존 수집 포맷인 `marketing_tone_info.xlsx`를 자동으로 CSV로 변환하여 사용합니다)
+(참고: `marketing_tone_info.csv`가 리포지토리에 포함되어 있어 런타임에서는 CSV만으로 동작합니다. XLSX는 보관용이며 필요시 자동 변환 로직이 동작합니다)
 
 **컬럼 구조**:
 ```

@@ -100,7 +100,7 @@ print(result)
   - `brand_info.csv` — 브랜드 메타 정보
   - `products_db/all_products.csv` — 모든 제품 통합 CSV
   - `reviews_db/all_reviews.csv` — 통합 리뷰 CSV (벡터화 시 `lifestyle` 필터 적용)
-  - `brand_tone_corpus/marketing_tone_info.xlsx` — 브랜드별 마케팅 문장 (운영 기준: `marketing_tone_info.csv` 사용; XLSX가 있으면 자동 변환)
+  - `brand_tone_corpus/marketing_tone_info.xlsx` — 브랜드별 마케팅 문장 (운영 기준: `marketing_tone_info.csv` 사용; XLSX는 보관용이며 리포지토리에 CSV(`marketing_tone_info.csv`)가 포함되어 있어 런타임에 OpenPyXL/XLSX 지원이 없어도 동작합니다)
   - (참고) per-brand tone CSV는 보관용/레거시이며 시스템은 통합 CSV(`marketing_tone_info.csv`)를 사용합니다
 - `ingredients_db/cosmetic_ingredients.csv` — 성분 데이터 (선택적)
 - `vector_store/` — FAISS 스토어(자동 생성)
