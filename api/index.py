@@ -129,6 +129,7 @@ def save_marketing_data():
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'input_keywords': data.get('input_keywords', ''),
             'original_title': data.get('original_title', ''),
+            'original_body': data.get('original_body', ''),
             'final_title': data.get('final_title', ''),
             'final_body': data.get('final_body', ''),
             'is_edited': data.get('is_edited', False)
@@ -138,7 +139,7 @@ def save_marketing_data():
         file_exists = os.path.exists(csv_path)
 
         with open(csv_path, 'a', newline='', encoding='utf-8-sig') as f:
-            fieldnames = ['timestamp', 'input_keywords', 'original_title', 'final_title', 'final_body', 'is_edited']
+            fieldnames = ['timestamp', 'input_keywords', 'original_title', 'original_body', 'final_title', 'final_body', 'is_edited']
             writer = csv.DictWriter(f, fieldnames=fieldnames)
 
             if not file_exists:

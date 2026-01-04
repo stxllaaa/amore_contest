@@ -9,6 +9,7 @@ const errorState = document.getElementById('errorState');
 let originalTitle = '';
 let originalBody = '';
 let inputKeywords = '';
+let formDataSnapshot = {}; // 모든 폼 데이터 저장
 
 // 폼 제출 이벤트
 form.addEventListener('submit', async (e) => {
@@ -47,6 +48,18 @@ form.addEventListener('submit', async (e) => {
         preferred_brand: formData.get('preferred_brand'),
         lifestyle_keywords: preferredKeywords,  // 선호 키워드 사용
         message_purpose: 'personalized'
+    };
+
+    // 폼 데이터 스냅샷 저장 (CSV 저장용)
+    formDataSnapshot = {
+        age: data.age,
+        gender: data.gender,
+        price_sensitivity: data.price_sensitivity,
+        skin_type: data.skin_type,
+        skin_concerns: data.skin_concerns,
+        product_category: data.product_category,
+        preferred_brand: data.preferred_brand,
+        lifestyle_keywords: preferredKeywords.join(', ')
     };
 
     // 유효성 검사
@@ -198,10 +211,14 @@ async function saveAsMarketingAsset() {
     // 수정 여부 확인
     const isEdited = (currentTitle !== originalTitle) || (currentBody !== originalBody);
 
+    // 모든 폼 데이터를 문자열로 변환
+    const allFormData = JSON.stringify(formDataSnapshot);
+
     // 저장할 데이터
     const saveData = {
-        input_keywords: inputKeywords,
+        input_keywords: allFormData,  // 모든 폼 데이터를 JSON 문자열로 저장
         original_title: originalTitle,
+        original_body: originalBody,  // 원본 본문 추가
         final_title: currentTitle,
         final_body: currentBody,
         is_edited: isEdited
