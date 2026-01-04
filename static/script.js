@@ -29,10 +29,19 @@ form.addEventListener('submit', async (e) => {
     const weatherKeyword = formData.get('weather_keyword');
     const toneKeyword = formData.get('tone_keyword');
     const usageKeyword = formData.get('usage_keyword');
+    const customKeyword = formData.get('custom_keyword');
 
     if (weatherKeyword) preferredKeywords.push(weatherKeyword);
     if (toneKeyword) preferredKeywords.push(toneKeyword);
     if (usageKeyword) preferredKeywords.push(usageKeyword);
+
+    // 커스텀 키워드 처리 (콤마로 구분)
+    if (customKeyword && customKeyword.trim()) {
+        const customKeywords = customKeyword.split(',')
+            .map(keyword => keyword.trim())
+            .filter(keyword => keyword.length > 0);
+        preferredKeywords.push(...customKeywords);
+    }
 
     // 입력 키워드 저장 (나중에 CSV 저장용)
     inputKeywords = preferredKeywords.join(', ');
