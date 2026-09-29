@@ -6,6 +6,13 @@
 
 **재생성(Self-Correction) 로직:** 생성된 메시지를 제목·본문 길이, 금칙어, 톤 기준으로 검사하고, 기준에 미달하면 다시 생성하도록 LangGraph 워크플로우에 연결
 
+## 시연영상
+
+
+https://github.com/user-attachments/assets/089cf737-4f53-48e6-ab05-d6f043b9a19d
+
+
+
 ---
 
 LangGraph와 RAG 기술을 활용한 개인화 마케팅 메시지 자동 생성 시스템입니다.
