@@ -20,6 +20,8 @@ class MessageGenerationState(TypedDict):
     persona_id: str
     message_purpose: str
     brand: str  # optional
+    gender: str  # '남성' or '여성'
+    price_sensitivity: str  # 'Low', 'Mid', 'High'
 
     # 중간 결과
     persona_data: Dict
@@ -36,6 +38,7 @@ class MessageGenerationState(TypedDict):
     body: str
     is_valid: bool
     validation_issues: List[str]
+    retry_count: int  # 재시도 횟수
 
 
 class GraphNodes:
@@ -53,10 +56,6 @@ class GraphNodes:
         )
 
         # 데이터 로드
-        self.personas_df = pd.read_csv(
-            Path(os.getenv("CUSTOMERS_DB_PATH", "./customers_db")) / "customer_personas.csv",
-            encoding='utf-8-sig'
-        )
         self.brands_df = pd.read_csv(
             self.db_path / "brand_info.csv",
             encoding='utf-8-sig'
@@ -66,18 +65,8 @@ class GraphNodes:
         """노드 1: 페르소나 분석"""
         print("\n[1. Persona Analyzer] 페르소나 분석 중...")
 
-        # use_csv 플래그 확인 (폼 데이터 직접 사용 시 CSV 로드 스킵)
-        if state.get('use_csv', True) and state.get('persona_data'):
-            # 이미 persona_data가 있으면 그대로 사용
-            persona = state['persona_data']
-        elif state.get('use_csv', True):
-            # CSV에서 페르소나 데이터 로드
-            persona = self.personas_df[
-                self.personas_df['persona_id'] == state['persona_id']
-            ].iloc[0].to_dict()
-        else:
-            # 폼 데이터로 전달된 persona_data 사용
-            persona = state['persona_data']
+        # 폼 데이터로 전달된 persona_data 사용
+        persona = state['persona_data']
 
         # 프롬프트 생성
         prompt = PERSONA_ANALYZER_PROMPT.format(**persona)
@@ -124,12 +113,20 @@ class GraphNodes:
 
         persona = state['persona_data']
 
-        # 브랜드가 지정되지 않은 경우 선호 브랜드에서 선택
+        # 브랜드가 지정되지 않은 경우 선호 브랜드에서 선택 (한글 이름 사용)
         if not state.get('brand'):
             preferred_brands = persona['preferred_brands'].split(',')
             selected_brand_name = preferred_brands[0].strip()
         else:
-            selected_brand_name = state['brand']
+            provided = state['brand']
+            # 입력값이 brand_id(영문)인 경우 한글 brand_name으로 변환
+            if provided and provided in self.brands_df['brand_id'].values:
+                selected_brand_name = self.brands_df[
+                    self.brands_df['brand_id'] == provided
+                ].iloc[0]['brand_name']
+            else:
+                # 이미 한글 브랜드명으로 전달된 경우 그대로 사용
+                selected_brand_name = provided
 
         # 브랜드 정보 로드 (brand_name으로 검색)
         brand_df_filtered = self.brands_df[
@@ -149,42 +146,256 @@ class GraphNodes:
         return state
 
     def product_retriever(self, state: MessageGenerationState) -> MessageGenerationState:
-        """노드 3: 제품 검색 (RAG)"""
+        """노드 3: 제품 검색 (RAG) - 카테고리 우선 매칭 + 키워드 의미 기반 매칭 + 가격 민감도 반영"""
         print("\n[3. Product Retriever] 제품 검색 중...")
 
         persona = state['persona_data']
+        price_sensitivity = state.get('price_sensitivity', 'Mid')
 
-        # 검색 쿼리 생성
-        query = f"{persona['skin_type']} 피부, {persona['skin_concerns']} 고민, {', '.join(state['core_needs'])}"
+        # 사용자가 선택한 카테고리 (필수)
+        preferred_category = persona.get('product_category', '')
+        print(f"  [DEBUG] 선호 카테고리: {preferred_category}")
+        print(f"  [DEBUG] 가격 민감도: {price_sensitivity}")
 
-        # Vector search (더 많은 결과를 가져와서 브랜드 필터링)
-        results = self.vector_manager.search_products(query, k=20)
+        if not preferred_category:
+            print(f"  [WARNING] 선호 카테고리가 지정되지 않았습니다.")
 
-        # 선택된 브랜드의 제품만 필터링
+        # 라이프스타일 키워드 확장 (의미 기반 매칭 - 더 넓은 범위)
+        lifestyle_keywords = persona.get('lifestyle_keywords', '')
+        expanded_query = self._expand_lifestyle_keywords(lifestyle_keywords)
+
+        # 검색 쿼리 생성 (확장된 키워드 포함)
+        query = f"{persona['skin_type']} 피부, {persona['skin_concerns']} 고민, {', '.join(state['core_needs'])}, {expanded_query}"
+
+        print(f"  [DEBUG] 검색 쿼리: {query}")
+
+        # Vector search (더 많은 결과를 가져와서 필터링)
+        results = self.vector_manager.search_products(query, k=50)
+
+        # 선택된 브랜드 + 카테고리의 제품만 엄격하게 필터링
         products = []
+        fallback_products = []  # 카테고리 불일치 제품 (최후의 수단)
+
         for doc in results:
-            if doc.metadata.get('brand') == state['selected_brand']:
+            # 브랜드 매칭 (필수)
+            if doc.metadata.get('brand') != state['selected_brand']:
+                continue
+
+            product_category = doc.metadata.get('category', '')
+
+            # 가격 정보 추출 및 변환 (문자열 "2,500" -> 숫자 2500)
+            price_str = doc.metadata.get('price', '0')
+            try:
+                price = int(str(price_str).replace(',', '').replace('원', '').strip())
+            except (ValueError, AttributeError):
+                price = 0
+
+            # 카테고리 매칭 (최우선)
+            if preferred_category and product_category == preferred_category:
                 products.append({
                     'name': doc.metadata['product_name'],
-                    'category': doc.metadata['category'],
-                    'description': doc.page_content
+                    'category': product_category,
+                    'description': doc.page_content,
+                    'price': price
                 })
-                if len(products) >= 3:
-                    break
+            elif not preferred_category:
+                # 카테고리 선호가 없는 경우만 다른 카테고리 허용
+                fallback_products.append({
+                    'name': doc.metadata['product_name'],
+                    'category': product_category,
+                    'description': doc.page_content,
+                    'price': price
+                })
 
-        state['retrieved_products'] = products
+        # 선호 카테고리에서 제품을 찾지 못한 경우
+        if len(products) < 3:
+            if len(products) == 0:
+                print(f"  [ERROR] 선호 카테고리({preferred_category})에서 제품을 찾을 수 없습니다.")
+                print(f"  [WARNING] 검색 쿼리를 더 넓혀서 재시도합니다.")
 
-        print(f"  [OK] 검색된 제품: {len(products)}개")
+                # 더 넓은 쿼리로 재검색 (라이프스타일 키워드만 사용)
+                broad_query = f"{expanded_query}, {persona['skin_type']}"
+                broad_results = self.vector_manager.search_products(broad_query, k=100)
+
+                for doc in broad_results:
+                    if doc.metadata.get('brand') == state['selected_brand'] and \
+                       doc.metadata.get('category') == preferred_category:
+                        price_str = doc.metadata.get('price', '0')
+                        try:
+                            price = int(str(price_str).replace(',', '').replace('원', '').strip())
+                        except (ValueError, AttributeError):
+                            price = 0
+
+                        products.append({
+                            'name': doc.metadata['product_name'],
+                            'category': doc.metadata['category'],
+                            'description': doc.page_content,
+                            'price': price
+                        })
+            else:
+                print(f"  [INFO] 선호 카테고리({preferred_category})에서 {len(products)}개만 발견")
+
+        # 여전히 부족하면 fallback 사용 (카테고리 선호가 없는 경우만)
+        if len(products) < 3 and not preferred_category and fallback_products:
+            needed = 3 - len(products)
+            products.extend(fallback_products[:needed])
+            print(f"  [INFO] fallback 제품 {needed}개 추가")
+
+        # 가격 민감도에 따라 정렬 (Soft Logic - Re-ranking)
+        if price_sensitivity == 'Low':
+            # 가성비 중시: 가격 낮은 순
+            products.sort(key=lambda x: x['price'])
+            print(f"  [SORT] 가성비 중시 - 가격 낮은 순 정렬")
+        elif price_sensitivity == 'High':
+            # 고가 선호: 가격 높은 순
+            products.sort(key=lambda x: x['price'], reverse=True)
+            print(f"  [SORT] 고가 선호 - 가격 높은 순 정렬")
+        else:
+            # Mid: 유사도 순 그대로 (정렬하지 않음)
+            print(f"  [SORT] 중간 가격대 - 유사도 순 유지")
+
+        # 최종 3개 선택
+        final_products = products[:3]
+
+        # 성분 기반 추가 정보 enrichment
+        enriched_products = self._enrich_with_ingredients(final_products, persona)
+
+        state['retrieved_products'] = enriched_products
+
+        print(f"  [OK] 검색된 제품: {len(enriched_products)}개")
+        for p in enriched_products:
+            print(f"    - {p['name']} (카테고리: {p['category']}, 가격: {p['price']:,}원)")
+
         return state
 
+    def _expand_lifestyle_keywords(self, lifestyle_keywords: str) -> str:
+        """라이프스타일 키워드를 의미적으로 확장 (더 넓은 범위)"""
+        # 키워드 매핑 딕셔너리 (유사 의미 단어들 - 확장판)
+        keyword_mapping = {
+            # 날씨 관련
+            "더운 날씨": [
+                "여름", "더위", "무더위", "열감", "땀", "시원한", "쿨링", "상쾌한",
+                "청량", "화끈", "뜨거운", "햇빛", "자외선", "열", "더운",
+                "여름철", "여름에", "덥고", "날씨가 더워", "날씨 덥"
+            ],
+            "추운 날씨": [
+                "겨울", "추위", "건조", "갑작스런 날씨", "날씨 변화", "보습", "촉촉",
+                "차가운", "찬바람", "추운", "겨울철", "겨울에", "한파", "쌀쌀",
+                "날씨 추", "날씨가 추워", "추워서", "춥고", "건조한"
+            ],
+            "건조한 날씨": [
+                "건조", "건성", "수분", "보습", "촉촉", "당김",
+                "푸석", "거친", "각질", "트고", "갈라지고", "건조해서",
+                "건조한", "수분 부족", "속건조", "날씨 건조", "건조함"
+            ],
+
+            # 톤 관련
+            "쿨톤": [
+                "차가운 톤", "블루 베이스", "핑크", "시원한 색감",
+                "쿨", "청량", "푸른", "차분한", "핑크빛", "로즈", "퍼플"
+            ],
+            "웜톤": [
+                "따뜻한 톤", "옐로우 베이스", "오렌지", "따뜻한 색감",
+                "웜", "노란", "황금", "코랄", "피치", "베이지", "따스한"
+            ],
+
+            # 용도 관련
+            "선물용": [
+                "선물", "gift", "기프트", "특별한", "프리미엄",
+                "고급", "럭셔리", "기념일", "생일", "어버이날", "발렌타인",
+                "화이트데이", "크리스마스", "이벤트", "선물하기", "선물 받"
+            ],
+            "데일리 케어": [
+                "데일리", "매일", "일상", "daily", "꾸준히", "1일1팩", "루틴",
+                "평소", "자주", "계속", "꾸준", "습관", "반복", "일상적",
+                "매일매일", "매일 사용", "날마다", "매번", "항상", "기본"
+            ]
+        }
+
+        # 키워드 확장
+        expanded = []
+        for keyword in lifestyle_keywords.split(','):
+            keyword = keyword.strip()
+            if keyword in keyword_mapping:
+                # 원본 키워드도 포함
+                expanded.append(keyword)
+                expanded.extend(keyword_mapping[keyword])
+            else:
+                expanded.append(keyword)
+
+        return ", ".join(expanded)
+
+    def _enrich_with_ingredients(self, products: list, persona: dict) -> list:
+        """제품에 성분 정보 추가 (피부 고민 기반)"""
+        # 성분 벡터 스토어가 없으면 원본 반환
+        if not self.vector_manager.ingredients_store:
+            return products
+
+        # 피부 고민으로 관련 성분 검색
+        skin_concerns = persona.get('skin_concerns', '')
+        if not skin_concerns:
+            return products
+
+        print(f"  [Ingredients] 피부 고민 '{skin_concerns}'에 맞는 성분 검색 중...")
+
+        # 성분 검색
+        ingredient_results = self.vector_manager.search_ingredients(
+            query=f"{skin_concerns} 피부 고민에 좋은 성분",
+            k=5
+        )
+
+        if not ingredient_results:
+            return products
+
+        # 검색된 성분 정보 정리
+        ingredients_info = []
+        for ing_doc in ingredient_results:
+            ing_name_kor = ing_doc.metadata.get('ingredient_kor', '')
+            ing_name_eng = ing_doc.metadata.get('ingredient_eng', '')
+            ing_function = ing_doc.metadata.get('function', '')
+            ing_description = ing_doc.metadata.get('description', '')
+
+            # function이 비어있으면 description의 첫 100자 사용
+            if not ing_function or ing_function == 'nan':
+                ing_function = ing_description[:100] if ing_description else ''
+
+            if ing_name_kor and ing_name_kor not in ['제목 없음', 'No Title']:
+                ingredients_info.append({
+                    'name': ing_name_kor,
+                    'name_eng': ing_name_eng,
+                    'function': ing_function
+                })
+
+        if ingredients_info:
+            print(f"  [Ingredients] 발견된 성분: {', '.join([i['name'] for i in ingredients_info[:3]])}")
+
+        # 각 제품 설명에 성분 정보 추가
+        for product in products:
+            if ingredients_info:
+                ingredient_text = " | ".join([
+                    f"{ing['name']}({ing['function'][:30]}...)" if len(ing['function']) > 30
+                    else f"{ing['name']}({ing['function']})"
+                    for ing in ingredients_info[:3]
+                ])
+                product['description'] += f"\n\n[추천 성분] {ingredient_text}"
+                product['ingredients'] = ingredients_info[:3]
+
+        return products
+
     def review_context_enricher(self, state: MessageGenerationState) -> MessageGenerationState:
-        """노드 4: 리뷰 컨텍스트 추가"""
+        """노드 4: 리뷰 컨텍스트 추가 - 라이프스타일 키워드 기반 + 성별 반영"""
         print("\n[4. Review Context Enricher] 리뷰 분석 중...")
 
         persona = state['persona_data']
+        gender = state.get('gender', '여성')
 
-        # 유사 리뷰 검색
-        query = f"{persona['age']}세 {persona['occupation']} {persona['lifestyle_keywords']}"
+        # 라이프스타일 키워드 확장
+        lifestyle_keywords = persona.get('lifestyle_keywords', '')
+        expanded_query = self._expand_lifestyle_keywords(lifestyle_keywords)
+
+        # 유사 리뷰 검색 (확장된 키워드 + 성별 포함)
+        query = f"{persona['age']}세 {gender} {persona['skin_type']} {expanded_query}"
+        print(f"  [DEBUG] 리뷰 검색 쿼리: {query}")
         review_results = self.vector_manager.search_reviews(query, k=3)
 
         reviews_text = "\n".join([doc.page_content for doc in review_results])
@@ -193,8 +404,8 @@ class GraphNodes:
         prompt = REVIEW_ENRICHER_PROMPT.format(
             reviews=reviews_text,
             age=persona['age'],
-            occupation=persona['occupation'],
-            lifestyle_keywords=persona['lifestyle_keywords']
+            occupation=persona.get('occupation', ''),
+            lifestyle_keywords=lifestyle_keywords
         )
 
         messages = [HumanMessage(content=prompt)]
@@ -259,12 +470,13 @@ class GraphNodes:
             brand_name=brand_info['brand_name'],
             target_age=brand_info['target_age'],
             brand_concept=brand_info['brand_concept'],
-            persona_name=persona['persona_name'],
+            persona_name=persona.get('persona_name', '고객님'),
             age=persona['age'],
-            gender='여성' if persona['gender'] == 'F' else '남성',
-            occupation=persona['occupation'],
+            gender='여성' if persona.get('gender', 'F') == 'F' else '남성',
+            occupation=persona.get('occupation', ''),
             skin_concerns=persona['skin_concerns'],
-            lifestyle_keywords=persona['lifestyle_keywords'],
+            lifestyle_keywords=persona.get('lifestyle_keywords', ''),
+            price_sensitivity=state.get('price_sensitivity', 'Mid'),
             products=products_text,
             tone_examples=tone_text,
             empathy_points=", ".join(state['empathy_points']),
@@ -351,5 +563,7 @@ class GraphNodes:
             print("  [OK] 검증 통과!")
         else:
             print(f"  [FAIL] 검증 실패: {issues}")
+            # 검증 실패 시 재시도 횟수 증가
+            state['retry_count'] = state.get('retry_count', 0) + 1
 
         return state

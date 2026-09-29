@@ -63,13 +63,13 @@ def generate_message():
         # 폼 데이터에서 페르소나 정보 추출
         persona_data = {
             'age': data.get('age'),
-            'gender': data.get('gender', 'F'),
-            'occupation': data.get('occupation', '직장인'),
+            'gender': data.get('gender', '여성'),
+            'price_sensitivity': data.get('price_sensitivity', 'Mid'),
             'skin_type': data.get('skin_type', '복합성'),
             'skin_concerns': data.get('skin_concerns', ''),
             'preferred_brands': data.get('preferred_brand', '라네즈'),
             'lifestyle_keywords': ', '.join(data.get('lifestyle_keywords', [])),
-            'product_category': data.get('product_category', '스킨케어'),
+            'product_category': data.get('product_category', 'skin'),
         }
 
         message_purpose = data.get('message_purpose', 'personalized')
@@ -110,6 +110,57 @@ def get_brands():
         {'id': 'iope', 'name': '아이오페', 'description': '과학적이고 신뢰감 있는 더마 케어'}
     ]
     return jsonify(brands)
+
+
+@app.route('/api/save', methods=['POST'])
+def save_marketing_data():
+    """생성된 마케팅 메시지를 CSV 파일에 저장"""
+    try:
+        import csv
+        from datetime import datetime
+
+        data = request.json
+
+        # CSV 파일 경로
+        csv_path = os.path.join(root_path, 'marketing_data_asset.csv')
+
+        # 저장할 데이터
+        row = {
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'input_keywords': data.get('input_keywords', ''),
+            'original_title': data.get('original_title', ''),
+            'original_body': data.get('original_body', ''),
+            'final_title': data.get('final_title', ''),
+            'final_body': data.get('final_body', ''),
+            'is_edited': data.get('is_edited', False)
+        }
+
+        # CSV 파일이 없으면 헤더와 함께 생성
+        file_exists = os.path.exists(csv_path)
+
+        with open(csv_path, 'a', newline='', encoding='utf-8-sig') as f:
+            fieldnames = ['timestamp', 'input_keywords', 'original_title', 'original_body', 'final_title', 'final_body', 'is_edited']
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+            if not file_exists:
+                writer.writeheader()
+
+            writer.writerow(row)
+
+        return jsonify({
+            'success': True,
+            'message': '마케팅 자산으로 저장되었습니다.'
+        })
+
+    except Exception as e:
+        print(f"Save Error: {e}")
+        import traceback
+        traceback.print_exc()
+
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 # Vercel Serverless Function 핸들러

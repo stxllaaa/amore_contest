@@ -75,6 +75,7 @@ MESSAGE_GENERATOR_PROMPT = """아모레퍼시픽 CRM 마케팅 메시지를 생�
 - 직업: {occupation}
 - 피부 고민: {skin_concerns}
 - 라이프스타일: {lifestyle_keywords}
+- 가격 민감도: {price_sensitivity}
 
 ## 추천 제품
 {products}
@@ -94,6 +95,10 @@ MESSAGE_GENERATOR_PROMPT = """아모레퍼시픽 CRM 마케팅 메시지를 생�
 3. 브랜드 톤앤매너 반영 ({tone_style})
 4. 고객의 라이프스타일과 니즈에 공감
 5. 제품의 핵심 혜택 강조
+6. 가격 민감도 반영:
+   - Low (가성비 중시): "합리적인 가격", "가성비 좋은", "똑똑한 선택" 등의 표현 사용
+   - High (고가 선호): "프리미엄", "럭셔리한 경험", "특별한" 등의 표현 사용
+   - Mid (중간): 가격에 대한 언급 최소화, 제품 가치와 효능에 집중
 
 JSON 형식으로 응답:
 {{
